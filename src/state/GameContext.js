@@ -2,85 +2,190 @@
 // OYUN DURUMU — React Context
 // ============================================
 
-import React, { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRandomEvent } from '../data/events.js';
 import { EVENTS_2008 } from '../data/events_2008.js';
 import { PRODUCTS, NEED_TARGETS } from '../data/products.js';
 import { STOCKS, STOCK_VOLATILITY } from '../data/stocks.js';
 import { ECONOMY, MONTHS_TR } from '../data/economy.js';
+import { QUESTS_DATA } from '../data/quests.js';
+import { generateCharacterProfile } from '../data/characterModels.js';
+import { calculateGainedExp, checkLevelUp } from '../data/levels.js';
+import { EventEngine } from '../utils/EventEngine.js';
+import { AIStoryteller } from '../utils/AIStoryteller.js';
 
 const STORAGE_KEY = 'life-sim-save';
 
 // İlk durum
-const getInitialState = () => ({
-  // Oyuncu
-  money: ECONOMY.salary.baseSalary,
-  salary: ECONOMY.salary.baseSalary,
-  job: 'İşçi',
-  hasWorked: false,
-  hasPaid: false,
-  energy: 100,
-  stress: 0,
-  relationship: 50,
-  health: 100,
-  happiness: 50,
-  reputation: 50,
-  inventory: [],
-  skills: [],
-  bankDebt: 0,
-  creditScore: 1200,
-  isGameOver: false,
-  gameOverReason: '',
-  delayedEvents: [],
-  lastEvent: null,
+const getInitialState = (customProfile = null) => {
+  const isDefault = !customProfile;
+  const charData = customProfile || generateCharacterProfile('story_middle', 'Oyuncu', 'Erkek', 'Türkiye');
+  
+  return {
+    runId: Date.now().toString(),
+    isCharacterCreated: !isDefault,
+    isGeneratingEvent: false, // AI olay oluşturma bekleme durumu
+    // -- YENİ KARAKTER SİSTEMİ --
+    profile: charData.profile,
+    hiddenStats: charData.stats, // luck, discipline, vb. ve level yapıları
+    memories: [], // Karakterin anıları
+    encounteredEvents: [], // Daha önce yaşanmış olaylar (tekrarı önlemek için)
+    experience: {
+      job: 0,
+      finance: 0,
+      education: 0,
+      health: 0,
+      social: 0,
+      happiness: 0,
+      prestige_neighborhood: 0,
+      prestige_city: 0,
+      prestige_country: 0
+    },
+    // ---------------------------
 
-  // Zaman Sistemi
-  day: 1,
-  hasWorked: false,
-  currentEvent: null,
+    // Oyuncu temel verilerini charData'dan alıyoruz
+    money: charData.stats.money,
+    salary: charData.stats.salary,
+    job: charData.stats.job,
+    bankDebt: charData.stats.bankDebt,
+    
+    // Hayati Değerler
+    energy: charData.vitals.energy,
+    stress: charData.vitals.stress,
+    relationship: charData.vitals.relationship,
+    health: charData.vitals.health,
+    happiness: charData.vitals.happiness,
+    hunger: charData.vitals.hunger,
+    social: charData.vitals.social,
+    hasWorked: false,
+    hasPaid: false,
+    reputation: 50,
+    inventory: [],
+    skills: [],
+    isGameOver: false,
+    gameOverReason: '',
+    wantedLevel: 0, // Aranma seviyesi (0-100)
+    delayedEvents: [],
+    lastEvent: null,
 
-  // İhtiyaçlar
-  needs: {
-    food: { current: 0, target: NEED_TARGETS['Yiyecek'] },
-    transport: { current: 0, target: NEED_TARGETS['Ulaşım'] },
-    rent: { current: 0, target: NEED_TARGETS['Kira'] },
-  },
+    // Zaman Sistemi
+    day: 1,
+    hasWorked: false,
+    currentEvent: null,
 
-  // Portföy
-  portfolio: { altin: 0, thy: 0, bim: 0, aselsan: 0 },
+    // Görevler Modu
+    quests: {
+      active: [],
+      completed: [],
+      failed: [],
+      lastAssignedDay: 0
+    },
 
-  // Tarih
-  year: ECONOMY.startYear,
-  month: ECONOMY.startMonth,
-  monthCount: 0,
+    // İhtiyaçlar
+    needs: {
+      food: { current: 0, target: NEED_TARGETS['Yiyecek'] },
+      transport: { current: 0, target: NEED_TARGETS['Ulaşım'] },
+      rent: { current: 0, target: NEED_TARGETS['Kira'] },
+    },
 
-  // Ürün fiyatları (kopyalar ve yıl kısıtlaması)
-  currentProducts: PRODUCTS.filter(p => {
-    if (p.minYear && ECONOMY.startYear < p.minYear) return false;
-    if (p.maxYear && ECONOMY.startYear > p.maxYear) return false;
-    return true;
-  }).map(p => ({ ...p })),
-  currentStocks: STOCKS.map(s => ({ ...s })),
+    // Portföy
+    portfolio: { altin: 0, thy: 0, bim: 0, aselsan: 0 },
 
-  // İşlem geçmişi
-  transactions: [],
+    // Tarih
+    year: ECONOMY.startYear,
+    month: ECONOMY.startMonth,
+    monthCount: 0,
 
-  // İstatistikler
-  stats: { totalEarned: 0, totalSpent: 0, monthsPlayed: 0 },
+    // Ürün fiyatları (kopyalar ve yıl kısıtlaması)
+    currentProducts: PRODUCTS.filter(p => {
+      if (p.minYear && ECONOMY.startYear < p.minYear) return false;
+      if (p.maxYear && ECONOMY.startYear > p.maxYear) return false;
+      return true;
+    }).map(p => ({ ...p })),
+    currentStocks: STOCKS.map(s => ({ ...s })),
 
-  // UI durumu
-  loaded: false,
-});
+    // İşlem geçmişi
+    transactions: [],
+
+    // İstatistikler
+    stats: { totalEarned: 0, totalSpent: 0, monthsPlayed: 0 },
+
+    // UI durumu
+    loaded: false,
+  };
+};
+
+// Görev ilerlemesini kontrol eden yardımcı fonksiyon
+function updateQuestProgress(state, conditionType, amount = 1) {
+  if (!state.quests || !state.quests.active) return state;
+
+  let newMoney = state.money;
+  let newReputation = state.reputation || 50;
+  let newWanted = state.wantedLevel || 0;
+  let newInventory = [...(state.inventory || [])];
+
+  const stillActive = [];
+  const newlyCompleted = [];
+
+  state.quests.active.forEach(quest => {
+    if (quest.conditionType === conditionType) {
+      const updatedAmount = (quest.currentAmount || 0) + amount;
+      if (updatedAmount >= quest.targetAmount) {
+        newlyCompleted.push({ ...quest, currentAmount: quest.targetAmount });
+        // Ödülleri ver
+        if (quest.rewards.money) newMoney += quest.rewards.money;
+        if (quest.rewards.reputation) newReputation += quest.rewards.reputation;
+        if (quest.rewards.wantedLevelChange) newWanted = Math.max(0, newWanted + quest.rewards.wantedLevelChange);
+        if (quest.rewards.item) newInventory.push(quest.rewards.item.id);
+      } else {
+        stillActive.push({ ...quest, currentAmount: updatedAmount });
+      }
+    } else {
+      stillActive.push(quest);
+    }
+  });
+
+  return {
+    ...state,
+    money: newMoney,
+    reputation: newReputation,
+    wantedLevel: newWanted,
+    inventory: newInventory,
+    quests: {
+      ...state.quests,
+      active: stillActive,
+      completed: [...(state.quests.completed || []), ...newlyCompleted]
+    }
+  };
+}
 
 // Reducer
 function gameReducer(state, action) {
   switch (action.type) {
     case 'LOAD_STATE':
-      return { ...state, ...action.payload, loaded: true };
+      return { ...state, ...action.payload, loaded: true, isGeneratingEvent: false };
 
     case 'SET_LOADED':
-      return { ...state, loaded: true };
+      return { ...state, loaded: true, isGeneratingEvent: false };
+
+    case 'START_GENERATING_EVENT':
+      return { ...state, isGeneratingEvent: true };
+
+    case 'FINISH_GENERATING_EVENT':
+      return { ...state, isGeneratingEvent: false, currentEvent: action.payload };
+
+    case 'ACCEPT_QUEST': {
+      const { quest } = action.payload;
+      if (state.quests.active.find(q => q.id === quest.id)) return state;
+      return {
+        ...state,
+        quests: {
+          ...state.quests,
+          active: [...state.quests.active, { ...quest, currentAmount: 0 }]
+        }
+      };
+    }
 
     case 'BUY_PRODUCT': {
       const { product, amount = 1 } = action.payload;
@@ -117,7 +222,7 @@ function gameReducer(state, action) {
         newStress = Math.max(0, newStress - (totalCost * 1.2));
       }
 
-      return {
+      const baseState = {
         ...state,
         money: state.money - totalCost,
         needs: newNeeds,
@@ -128,6 +233,7 @@ function gameReducer(state, action) {
           totalSpent: state.stats.totalSpent + totalCost,
         },
       };
+      return product.category === 'Yiyecek' ? updateQuestProgress(baseState, 'buy_food', 1) : baseState;
     }
 
     case 'TAKE_LOAN': {
@@ -156,9 +262,29 @@ function gameReducer(state, action) {
         ...state,
         money: state.money - course.cost,
         skills: [...(state.skills || []), course.id],
-        job: course.newJob,
-        salary: state.salary + course.salaryIncrease,
         happiness: Math.min(100, (state.happiness || 50) + 20)
+      };
+    }
+
+    case 'CHANGE_JOB': {
+      const { job } = action.payload;
+      if (!job) {
+        // İstifa etme durumu
+        return {
+          ...state,
+          job: 'İşsiz',
+          salary: 0,
+          currentJobId: null,
+          stress: Math.max(0, (state.stress || 0) - 20), // İstifa edince rahatlar
+          happiness: Math.max(0, (state.happiness || 50) - 10) // Ama parasızlık korkutur
+        };
+      }
+      return {
+        ...state,
+        job: job.title,
+        salary: job.salary,
+        currentJobId: job.id,
+        stress: Math.min(100, (state.stress || 0) + 10) // Yeni işe girmenin gerginliği
       };
     }
 
@@ -173,12 +299,19 @@ function gameReducer(state, action) {
     }
 
     case 'WORK': {
-      if (state.hasWorked || state.job === 'İşsiz') return state;
+      if (state.hasWorked || state.job === 'İşsiz' || !state.currentJobId) return state;
       const currentEnergy = state.energy ?? 100;
       const currentStress = state.stress ?? 0;
       const currentHealth = state.health ?? 100;
       
-      if (currentEnergy < 20) return state;
+      const { JOBS } = require('../data/jobs');
+      const jobData = JOBS.find(j => j.id === state.currentJobId);
+      
+      const energyCost = jobData ? jobData.energyCost : 30;
+      const stressCost = jobData ? jobData.stressCost : 20;
+      const wantedInc = jobData && jobData.wantedIncrease ? jobData.wantedIncrease : 0;
+      
+      if (currentEnergy < energyCost) return state;
 
       // İşten Kovulma Riski
       if (currentStress > 90 || currentHealth < 30) {
@@ -188,6 +321,7 @@ function gameReducer(state, action) {
             ...state,
             job: 'İşsiz',
             salary: 0,
+            currentJobId: null,
             stress: 100,
             happiness: 0,
             currentEvent: {
@@ -200,14 +334,52 @@ function gameReducer(state, action) {
         }
       }
 
-      let newEnergy = Math.max(0, currentEnergy - 30);
-      let newStress = Math.min(100, currentStress + 20);
+      let newEnergy = Math.max(0, currentEnergy - energyCost);
+      let newStress = Math.min(100, currentStress + stressCost);
+      let newWantedLevel = Math.min(100, (state.wantedLevel || 0) + wantedInc);
 
-      return { 
+      const baseState = { 
         ...state, 
         hasWorked: true, 
         energy: newEnergy, 
-        stress: newStress
+        stress: newStress,
+        wantedLevel: newWantedLevel
+      };
+      return updateQuestProgress(baseState, 'work', 1);
+    }
+
+    case 'VISIT_LOCATION': {
+      const location = action.payload; // { cost: 50, energyCost: 20, health: 10, stress: -30, moneyChange: 100 vb. }
+      const currentEnergy = state.energy ?? 100;
+      const currentMoney = state.money ?? 0;
+      
+      const energyCost = location.energyCost || 0;
+      const cost = location.cost || 0;
+
+      if (currentEnergy < energyCost) return state; // Enerji yetersiz
+      if (currentMoney < cost) return state; // Para yetersiz
+
+      let newEnergy = Math.max(0, Math.min(100, currentEnergy - energyCost + (location.energy || 0)));
+      let newMoney = currentMoney - cost + (location.moneyChange || 0);
+      let newStress = Math.max(0, Math.min(100, (state.stress || 0) + (location.stress || 0)));
+      let newHealth = Math.max(0, Math.min(100, (state.health || 100) + (location.health || 0)));
+      let newHappiness = Math.max(0, Math.min(100, (state.happiness || 50) + (location.happiness || 0)));
+      let newWantedLevel = Math.max(0, Math.min(100, (state.wantedLevel || 0) + (location.wantedLevel || 0)));
+      let newHunger = Math.max(0, Math.min(100, (state.hunger || 0) + (location.hunger || 0)));
+
+      return {
+        ...state,
+        energy: newEnergy,
+        money: newMoney,
+        stress: newStress,
+        health: newHealth,
+        happiness: newHappiness,
+        wantedLevel: newWantedLevel,
+        hunger: newHunger,
+        stats: {
+          ...state.stats,
+          totalSpent: state.stats.totalSpent + cost,
+        }
       };
     }
 
@@ -222,6 +394,15 @@ function gameReducer(state, action) {
       const newHealth = Math.max(0, Math.min(100, (state.health ?? 100) + (effects.health || 0)));
       const newHappiness = Math.max(0, Math.min(100, (state.happiness ?? 50) + (effects.happiness || 0)));
       const newReputation = Math.max(0, Math.min(100, (state.reputation ?? 50) + (effects.reputation || 0)));
+      const newWantedLevel = Math.max(0, Math.min(100, (state.wantedLevel || 0) + (effects.wantedLevel || 0)));
+
+      let isGameOver = state.isGameOver;
+      let gameOverReason = state.gameOverReason;
+
+      if (effects.isGameOver) {
+        isGameOver = true;
+        gameOverReason = effects.gameOverReason || "Bir seçiminin sonucunda hayatın tamamen mahvoldu.";
+      }
 
       // Gecikmeli Olay Kontrolü
       let updatedDelayedEvents = [...(state.delayedEvents || [])];
@@ -230,6 +411,25 @@ function gameReducer(state, action) {
           daysLeft: action.payload.delayedEffect.daysDelay,
           eventId: action.payload.delayedEffect.triggerEventId
         });
+      }
+
+      // Hafıza Sistemi
+      let updatedMemories = [...(state.memories || [])];
+      if (action.payload.newMemoryToSave) {
+        updatedMemories.push(action.payload.newMemoryToSave);
+      }
+
+      // Karşılaşılan Olaylar Listesi (Tekrarı Önleme)
+      let updatedEncountered = [...(state.encounteredEvents || [])];
+      if (state.currentEvent && state.currentEvent.id && !state.currentEvent.isAiEvent && !state.currentEvent.isRepeatable) {
+        updatedEncountered.push(state.currentEvent.id);
+      }
+
+      // Son Karşılaşılan Olaylar (Tekrarı Önleme - Son 7 Olay)
+      let updatedRecent = [...(state.recentEvents || [])];
+      if (state.currentEvent && state.currentEvent.id && !state.currentEvent.isAiEvent) {
+        updatedRecent.push(state.currentEvent.id);
+        if (updatedRecent.length > 7) updatedRecent.shift();
       }
 
       return {
@@ -241,18 +441,53 @@ function gameReducer(state, action) {
         health: newHealth,
         happiness: newHappiness,
         reputation: newReputation,
+        wantedLevel: newWantedLevel,
         delayedEvents: updatedDelayedEvents,
-        currentEvent: null // Olay bitti
+        memories: updatedMemories,
+        encounteredEvents: updatedEncountered,
+        recentEvents: updatedRecent,
+        currentEvent: null, // Olay bitti
+        isGameOver,
+        gameOverReason
       };
     }
 
+    case 'GAIN_EXP': {
+      const { category, amount } = action.payload; // category örn: 'job', 'finance'
+      const actualExp = calculateGainedExp(amount, state.hiddenStats || {});
+      const newExpAmount = (state.experience[category] || 0) + actualExp;
+      
+      const currentLevel = state.hiddenStats.levels[category] || 1;
+      
+      let newLevel = currentLevel;
+      // Level up check
+      if (checkLevelUp(currentLevel, newExpAmount)) {
+        newLevel += 1;
+        // İsteğe bağlı olarak burada alert veya event tetiklenebilir
+      }
+
+      return {
+        ...state,
+        experience: {
+          ...state.experience,
+          [category]: newExpAmount
+        },
+        hiddenStats: {
+          ...state.hiddenStats,
+          levels: {
+            ...state.hiddenStats.levels,
+            [category]: newLevel
+          }
+        }
+      };
+    }
 
     case 'BUY_STOCK': {
       const { stockId, amount, pricePerUnit } = action.payload;
       const totalCost = amount * pricePerUnit;
       if (totalCost > state.money) return state;
 
-      return {
+      const baseState = {
         ...state,
         money: state.money - totalCost,
         portfolio: {
@@ -265,6 +500,7 @@ function gameReducer(state, action) {
         ],
         stats: { ...state.stats, totalSpent: state.stats.totalSpent + totalCost },
       };
+      return updateQuestProgress(baseState, 'buy_stock', amount);
     }
 
     case 'SELL_STOCK': {
@@ -287,6 +523,17 @@ function gameReducer(state, action) {
       };
     }
 
+    case 'MINIGAME_COMPLETE': {
+      const { rewardMoney, rewardReputation, rewardWantedLevel } = action.payload;
+      const baseState = {
+        ...state,
+        money: state.money + (rewardMoney || 0),
+        reputation: (state.reputation || 50) + (rewardReputation || 0),
+        wantedLevel: Math.max(0, (state.wantedLevel || 0) + (rewardWantedLevel || 0)),
+      };
+      return updateQuestProgress(baseState, 'minigame_delivery', 1);
+    }
+
     case 'ADVANCE_TIME': {
       if (state.isGameOver) return state;
       
@@ -294,57 +541,81 @@ function gameReducer(state, action) {
       let newDay = state.day + daysToAdvance;
 
       let currentHealth = state.health ?? 100;
-      let currentHappiness = state.happiness ?? 50;
+      let currentHunger = state.hunger || 0;
       let currentStress = state.stress ?? 0;
+      let isGameOver = state.isGameOver;
+      let gameOverReason = state.gameOverReason;
 
-      // Hastalık Mekaniği (Sağlık 30'un altındaysa her gün erir)
-      if (currentHealth < 30) {
-        currentHealth -= (2 * daysToAdvance);
+      // Açlık ve Sağlık Güncellemesi
+      currentHunger = Math.min(100, currentHunger + (daysToAdvance * 10));
+      if (currentHunger >= 80) {
+        currentHealth = Math.max(0, currentHealth - (daysToAdvance * 10));
       }
 
       // Ölüm Kontrolü
       if (currentHealth <= 0) {
-        return {
-          ...state,
-          health: 0,
-          isGameOver: true,
-          gameOverReason: 'Sağlığını tamamen ihmal ettin ve ağır bir hastalık geçirerek hayatını kaybettin.'
-        };
+        isGameOver = true;
+        gameOverReason = 'Açlık ve bakımsızlık yüzünden vücudun iflas etti ve hayatını kaybettin.';
       }
-
-      // Gecikmeli olayları düşür
-      let currentDelayedEvents = [...(state.delayedEvents || [])];
-      let triggeredEventId = null;
-      currentDelayedEvents = currentDelayedEvents.map(e => ({ ...e, daysLeft: e.daysLeft - daysToAdvance }));
       
-      const triggered = currentDelayedEvents.filter(e => e.daysLeft <= 0);
-      if (triggered.length > 0) {
-        triggeredEventId = triggered[0].eventId;
-        currentDelayedEvents = currentDelayedEvents.filter(e => e.daysLeft > 0);
+      // Polis Yakalanma İhtimali
+      const currentWantedLevel = state.wantedLevel || 0;
+      if (currentWantedLevel > 0 && !isGameOver) {
+        const arrestChancePerDay = (currentWantedLevel / 10) * 0.02;
+        const totalArrestChance = arrestChancePerDay * daysToAdvance;
+        if (Math.random() < totalArrestChance) {
+          isGameOver = true;
+          gameOverReason = "Yasadışı faaliyetlerin polisin dikkatinden kaçmadı. Şafak operasyonuyla tutuklandın.";
+        }
+      }
+      
+      // Eğer dışarıdan hazır bir olay verilmişse (örneğin AI event), doğrudan onu kullan ve geri kalan ay sonu işlemlerini yap
+      let nextEvent = action.payload.injectedEvent || null;
+      let currentDelayedEvents = [...(state.delayedEvents || [])];
+      
+      if (!nextEvent) {
+        // Gecikmeli olayları düşür
+        let triggeredEventId = null;
+        currentDelayedEvents = currentDelayedEvents.map(e => ({ ...e, daysLeft: e.daysLeft - daysToAdvance }));
+        
+        const triggered = currentDelayedEvents.filter(e => e.daysLeft <= 0);
+        if (triggered.length > 0) {
+          triggeredEventId = triggered[0].eventId;
+          currentDelayedEvents = currentDelayedEvents.filter(e => e.daysLeft > 0);
+        }
+
+        // Cinnet Geçirme Mekaniği
+        if (currentStress >= 100 && (state.happiness || 50) <= 0 && Math.random() < 0.2) {
+           nextEvent = {
+              id: 'e_cinnet',
+              title: 'CİNNET GETİRDİN!',
+              text: 'Aylardır süren stres, borçlar ve mutsuzluk en sonunda patlamana neden oldu.',
+              choices: [{ text: 'Kendime Gelmeliyim...', effects: { money: -(state.money * 0.5), stress: -50, happiness: 10 } }]
+           };
+           currentDelayedEvents = currentDelayedEvents.map(e => ({ ...e, daysLeft: e.daysLeft + daysToAdvance })); // Gecikmeleri dondur
+        } 
+        else if (triggeredEventId) {
+          nextEvent = EVENTS_2008.find(e => e.id === triggeredEventId) || {
+            id: 'error_event', title: 'Hata', text: 'Olay bulunamadı.', choices: [{text:'Geç', effects:{}}]
+          };
+        } else {
+          // Normal Olay Çıkma İhtimali (%45)
+          const shouldTriggerEvent = Math.random() < 0.45;
+          
+          if (shouldTriggerEvent) {
+            const encountered = state.encounteredEvents || [];
+            const recent = state.recentEvents || [];
+            const rootEvents = EVENTS_2008.filter(e => 
+              !['e_askerlik_gbt', 'e_ilk_bulusma', 'e_nokia_patlama', 'e_akraba_trip', 'e_karanlik_is_sonuc', 'e_paket_acildi', 'e_otobus_kaza', 'e_canta_acildi'].includes(e.id) &&
+              !encountered.includes(e.id) &&
+              !recent.includes(e.id)
+            );
+            nextEvent = EventEngine.selectRandomEvent(rootEvents, state);
+          }
+        }
       }
 
-      let nextEvent = null;
-
-      // Cinnet Geçirme Mekaniği
-      if (currentStress >= 100 && currentHappiness <= 0 && Math.random() < 0.2) {
-         nextEvent = {
-            id: 'e_cinnet',
-            title: 'CİNNET GETİRDİN!',
-            text: 'Aylardır süren stres, borçlar ve mutsuzluk en sonunda patlamana neden oldu. Kontrolünü kaybettin ve elindeki paranın bir kısmını öfkeyle saçtın!',
-            choices: [{ text: 'Kendime Gelmeliyim...', effects: { money: -(state.money * 0.5), stress: -50, happiness: 10 } }]
-         };
-         currentDelayedEvents = currentDelayedEvents.map(e => ({ ...e, daysLeft: e.daysLeft + daysToAdvance })); // Gecikmeleri dondur
-      } 
-      else if (triggeredEventId) {
-        nextEvent = EVENTS_2008.find(e => e.id === triggeredEventId) || {
-          id: 'error_event', title: 'Hata', text: 'Olay bulunamadı.', choices: [{text:'Geç', effects:{}}]
-        };
-      } else {
-        const rootEvents = EVENTS_2008.filter(e => !['e_askerlik_gbt', 'e_ilk_bulusma', 'e_nokia_patlama', 'e_akraba_trip'].includes(e.id));
-        nextEvent = rootEvents[Math.floor(Math.random() * rootEvents.length)];
-      }
-
-      let newState = { ...state, health: currentHealth, currentEvent: nextEvent, delayedEvents: currentDelayedEvents };
+      let newState = { ...state, health: currentHealth, hunger: currentHunger, currentEvent: nextEvent, delayedEvents: currentDelayedEvents, isGameOver, gameOverReason };
       
       if (newDay <= 30) {
         // Ay bitmedi
@@ -361,6 +632,14 @@ function gameReducer(state, action) {
         newMonth = 0;
         newYear++;
         newSalary = Math.round(state.salary * (1 + ECONOMY.salary.annualRaisePercent / 100));
+      }
+
+      // Haciz Sistemi
+      let newInventory = [...(state.inventory || [])];
+      let newReputation = state.reputation || 50;
+      if (state.bankDebt > 5000 && state.money < 0) {
+          newInventory = []; 
+          newReputation = 0; 
       }
 
       // Enflasyon uygula ve zamana bağlı ürünleri filtrele
@@ -409,10 +688,19 @@ function gameReducer(state, action) {
       // Maaş ödemesi (Bu ay çalışıldıysa tam maaş)
       const earnedSalary = state.hasWorked ? newSalary : 0;
 
-      // Banka Faiz İşlemi (Aylık %5)
+      // Zorunlu Aylık Faturalar (Elektrik, Su, Doğalgaz, Telefon)
+      const monthlyBills = Math.round(150 + Math.random() * 100); // 150-250 TL arasi
+
+      // Karşılanmamış İhtiyaç Cezası
+      let unmetPenalty = 0;
+      if (state.needs.food.current < state.needs.food.target) unmetPenalty += 50; // Yemek borcun
+      if (state.needs.rent.current < state.needs.rent.target) unmetPenalty += 200; // Kira gecikme cezası
+      if (state.needs.transport.current < state.needs.transport.target) unmetPenalty += 20;
+
+      // Banka Faiz İşlemi (Aylık %8 - tefeci faizi)
       let newBankDebt = state.bankDebt || 0;
       if (newBankDebt > 0) {
-        newBankDebt = Math.round(newBankDebt * 1.05);
+        newBankDebt = Math.round(newBankDebt * 1.08);
       }
 
       return {
@@ -422,9 +710,11 @@ function gameReducer(state, action) {
         year: newYear,
         monthCount: state.monthCount + 1,
         salary: newSalary,
-        money: state.money + earnedSalary,
+        money: state.money + earnedSalary - monthlyBills - unmetPenalty,
         bankDebt: newBankDebt,
         hasWorked: false,
+        reputation: newReputation,
+        inventory: newInventory,
         needs: {
           food: { current: 0, target: state.needs.food.target },
           transport: { current: 0, target: (state.inventory || []).includes('a_car_sahin') ? 0 : state.needs.transport.target },
@@ -440,8 +730,19 @@ function gameReducer(state, action) {
       };
     }
 
-    case 'NEW_GAME':
-      return { ...getInitialState(), loaded: true };
+    case 'NEW_GAME': {
+      const customProfileData = action.payload; // { storyId, name, gender, country }
+      let newCharData = null;
+      if (customProfileData) {
+        newCharData = generateCharacterProfile(
+          customProfileData.storyId,
+          customProfileData.name,
+          customProfileData.gender,
+          customProfileData.country
+        );
+      }
+      return { ...getInitialState(newCharData), loaded: true };
+    }
 
     default:
       return state;
@@ -453,6 +754,32 @@ const GameContext = createContext(null);
 
 export function GameProvider({ children }) {
   const [state, dispatch] = useReducer(gameReducer, null, getInitialState);
+  const [cachedAiEvent, setCachedAiEvent] = useState(null);
+  const [cachedRunId, setCachedRunId] = useState(null);
+  const [isFetchingAi, setIsFetchingAi] = useState(false);
+
+  // Arka planda AI Senaryosu Hazırlama (Prefetching)
+  useEffect(() => {
+    // Yeni oyuna geçilmişse eski önbelleği temizle
+    if (state?.runId && cachedRunId !== state.runId) {
+      setCachedAiEvent(null);
+      setCachedRunId(state.runId);
+      return;
+    }
+
+    if (state?.loaded && state.isCharacterCreated && !cachedAiEvent && !isFetchingAi && !state.isGameOver) {
+      setIsFetchingAi(true);
+      AIStoryteller.generateDynamicEvent(state).then(ev => {
+        if (ev && ev.id !== 'ai_fallback') {
+          setCachedAiEvent(ev);
+        }
+        setIsFetchingAi(false);
+      }).catch(err => {
+        console.log('AI Prefetch error:', err);
+        setIsFetchingAi(false);
+      });
+    }
+  }, [state?.monthCount, state?.loaded, state?.isCharacterCreated, cachedAiEvent, isFetchingAi, state?.isGameOver]);
 
   // Kaydet
   const saveGame = useCallback(async (gameState) => {
@@ -469,6 +796,8 @@ export function GameProvider({ children }) {
         relationship: gameState.relationship ?? 50,
         health: gameState.health ?? 100,
         happiness: gameState.happiness ?? 50,
+        hunger: gameState.hunger || 0,
+        wantedLevel: gameState.wantedLevel || 0,
         reputation: gameState.reputation ?? 50,
         inventory: gameState.inventory || [],
         skills: gameState.skills || [],
@@ -477,12 +806,22 @@ export function GameProvider({ children }) {
         isGameOver: gameState.isGameOver || false,
         gameOverReason: gameState.gameOverReason || '',
         delayedEvents: gameState.delayedEvents || [],
+        encounteredEvents: gameState.encounteredEvents || [],
+        recentEvents: gameState.recentEvents || [],
+        memories: gameState.memories || [],
         lastEvent: gameState.lastEvent,
+        runId: gameState.runId,
         needs: gameState.needs,
         portfolio: gameState.portfolio,
         year: gameState.year,
         month: gameState.month,
         monthCount: gameState.monthCount,
+        isCharacterCreated: gameState.isCharacterCreated,
+        profile: gameState.profile,
+        hiddenStats: gameState.hiddenStats,
+        experience: gameState.experience || { job: 0, finance: 0, education: 0, health: 0, social: 0, happiness: 0, prestige_neighborhood: 0, prestige_city: 0, prestige_country: 0 },
+        hunger: gameState.hunger,
+        social: gameState.social,
         currentProducts: gameState.currentProducts.map(p => ({ id: p.id, price: p.price })),
         currentStocks: gameState.currentStocks.map(s => ({
           id: s.id, currentPrice: s.currentPrice, monthlyChangePercent: s.monthlyChangePercent,
@@ -518,6 +857,7 @@ export function GameProvider({ children }) {
             type: 'LOAD_STATE',
             payload: {
               ...data,
+              isCharacterCreated: true, // Yüklendiyse karakter vardır
               currentProducts: products,
               currentStocks: stocks,
             },
@@ -554,12 +894,36 @@ export function GameProvider({ children }) {
     return total;
   };
 
+  // Asenkron zaman ilerletme (AI Olayı entegrasyonu için)
+  const advanceTimeAsync = useCallback(async (days) => {
+    // Önce yeni ay/yıl durumuna bak
+    const willCrossYear = (state.day + days > 30) && (state.month + 1 >= 12);
+    
+    // Rastgele AI olayı çıkma ihtimali (Aylık/Haftalık atlamalarda %25 ihtimal)
+    const randomAiChance = !willCrossYear && Math.random() < 0.25;
+    
+    if (willCrossYear || randomAiChance) {
+      if (cachedAiEvent) {
+        // Hazırda bekleyen AI olayı varsa ANINDA ekrana ver, bekletme!
+        dispatch({ type: 'ADVANCE_TIME', payload: { days, injectedEvent: cachedAiEvent } });
+        setCachedAiEvent(null); // Yenisini arka planda hazırlamaya başla
+      } else {
+        // Henüz hazır değilse, oyuncuyu bekletmemek için normal devam et
+        dispatch({ type: 'ADVANCE_TIME', payload: { days } });
+      }
+    } else {
+      // Normal ilerleme
+      dispatch({ type: 'ADVANCE_TIME', payload: { days } });
+    }
+  }, [state, dispatch, cachedAiEvent]);
+
   const value = {
     state,
     dispatch,
     allNeedsMet,
     getMonthName,
     getPortfolioValue,
+    advanceTimeAsync,
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

@@ -11,9 +11,9 @@ export default function NeedsTracker() {
   const { state } = useGame();
 
   const needs = [
-    { key: 'food', label: 'Yiyecek', color: '#e67e22', bgColor: '#fef3e2', ...state.needs.food },
-    { key: 'transport', label: 'Ulaşım', color: '#3498db', bgColor: '#eaf2f8', ...state.needs.transport },
-    { key: 'rent', label: 'Kira', color: '#9b59b6', bgColor: '#f4ecf7', ...state.needs.rent },
+    { key: 'food', label: 'Yiyecek', color: '#e67e22', bgColor: 'rgba(230,126,34,0.1)', ...state.needs.food },
+    { key: 'transport', label: 'Ulaşım', color: '#3498db', bgColor: 'rgba(52,152,219,0.1)', ...state.needs.transport },
+    { key: 'rent', label: 'Kira', color: '#9b59b6', bgColor: 'rgba(155,89,182,0.1)', ...state.needs.rent },
   ];
 
   return (
@@ -27,7 +27,7 @@ export default function NeedsTracker() {
         const percent = Math.min((need.current / need.target) * 100, 100);
         const isComplete = need.current >= need.target;
         const barColor = isComplete ? '#2ecc71' : need.color;
-        const bgColor = isComplete ? '#eafaf1' : need.bgColor;
+        const bgColor = isComplete ? 'rgba(46,204,113,0.1)' : need.bgColor;
 
         return (
           <View key={need.key} style={[styles.needItem, { backgroundColor: bgColor }]}>
@@ -49,18 +49,13 @@ export default function NeedsTracker() {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: 'rgba(255,255,255,0.88)',
+    backgroundColor: '#2c3e50',
     borderRadius: 16,
     padding: 12,
     marginHorizontal: 16,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.5)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 3,
+    borderColor: '#34495e',
   },
   titleRow: {
     flexDirection: 'row',
@@ -74,7 +69,7 @@ const styles = StyleSheet.create({
   titleText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#2c3e50',
+    color: '#ecf0f1',
   },
   needItem: {
     padding: 8,
@@ -89,7 +84,7 @@ const styles = StyleSheet.create({
   needLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#2c3e50',
+    color: '#ecf0f1',
   },
   needValue: {
     fontSize: 12,
@@ -97,7 +92,7 @@ const styles = StyleSheet.create({
   },
   progressBg: {
     height: 8,
-    backgroundColor: '#ecf0f1',
+    backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 50,
     overflow: 'hidden',
     marginTop: 6,

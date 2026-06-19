@@ -22,9 +22,9 @@ export const ECONOMY = {
   },
 
   needs: {
-    food: { target: 150, label: 'Yiyecek' },
-    transport: { target: 30, label: 'Ulaşım' },
-    rent: { target: 450, label: 'Kira' },
+    food: { target: 250, label: 'Yiyecek' },
+    transport: { target: 50, label: 'Ulaşım' },
+    rent: { target: 550, label: 'Kira' },
   },
 };
 

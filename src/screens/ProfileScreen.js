@@ -4,8 +4,8 @@ import { useGame } from '../state/GameContext';
 import { formatMoneyFull } from '../utils/formatter';
 
 const COURSES = [
-  { id: 'c_english', title: 'İngilizce Kursu', cost: 1200, requirement: null, newJob: 'Kasiyer/Satış', salaryIncrease: 150 },
-  { id: 'c_code', title: 'Yazılım Kursu', cost: 3500, requirement: 'c_english', newJob: 'Yazılımcı', salaryIncrease: 400 },
+  { id: 'c_english', title: 'İngilizce Kursu', cost: 1200, requirement: null, desc: 'Kurumsal iş ilanlarına başvurmanı sağlar.' },
+  { id: 'c_code', title: 'Yazılım Kursu', cost: 3500, requirement: 'c_english', desc: 'Yazılımcı olarak çalışabilmeni sağlar.' },
 ];
 
 const ASSETS = [
@@ -60,6 +60,29 @@ export default function ProfileScreen() {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       
+      {/* Kişisel Bilgiler */}
+      <View style={styles.card}>
+        <View style={styles.titleRow}>
+          <Text style={styles.titleIcon}>👤</Text>
+          <Text style={styles.titleText}>Kişisel Bilgiler</Text>
+        </View>
+        <Text style={styles.statText}>İsim: {state.profile?.name} ({state.profile?.age} Yaş, {state.profile?.gender})</Text>
+        <Text style={styles.statText}>Geçmiş: {state.profile?.storyId}</Text>
+        <Text style={styles.statText}>Kader: {state.profile?.fateId}</Text>
+      </View>
+
+      {/* Seviyeler */}
+      <View style={styles.card}>
+        <View style={styles.titleRow}>
+          <Text style={styles.titleIcon}>⭐</Text>
+          <Text style={styles.titleText}>Seviyeler</Text>
+        </View>
+        <Text style={styles.statText}>İş Seviyesi: Lv{state.hiddenStats?.levels?.job || 1}</Text>
+        <Text style={styles.statText}>Finans Seviyesi: Lv{state.hiddenStats?.levels?.finance || 1}</Text>
+        <Text style={styles.statText}>Sosyal Seviye: Lv{state.hiddenStats?.levels?.social || 1}</Text>
+        <Text style={styles.statText}>Mahalle Prestiji: Lv{state.hiddenStats?.levels?.prestige_neighborhood || 1}</Text>
+      </View>
+
       {/* Kariyer ve Eğitim */}
       <View style={styles.card}>
         <View style={styles.titleRow}>
@@ -75,7 +98,8 @@ export default function ProfileScreen() {
             <View key={course.id} style={styles.itemRow}>
               <View style={styles.itemInfo}>
                 <Text style={styles.itemTitle}>{course.title} {isOwned && '✅'}</Text>
-                <Text style={styles.itemDesc}>+{formatMoneyFull(course.salaryIncrease)} Maaş Artışı</Text>
+                <Text style={styles.itemDesc}>{course.desc}</Text>
+                <Text style={styles.itemCost}>{formatMoneyFull(course.cost)}</Text>
               </View>
               <TouchableOpacity 
                 style={[styles.buyBtn, (isOwned || isLocked) && styles.buyBtnDisabled]} 
@@ -83,7 +107,7 @@ export default function ProfileScreen() {
                 disabled={isOwned || isLocked}
               >
                 <Text style={styles.buyBtnText}>
-                  {isOwned ? 'Tamamlandı' : (isLocked ? 'Kilitli' : `${formatMoneyFull(course.cost)}`)}
+                  {isOwned ? 'Tamamlandı' : (isLocked ? 'Kilitli' : 'Satın Al')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -143,6 +167,7 @@ const styles = StyleSheet.create({
   titleIcon: { fontSize: 20 },
   titleText: { fontSize: 18, fontWeight: '900', color: '#2c3e50' },
   infoText: { fontSize: 12, color: '#7f8c8d', marginBottom: 16, fontWeight: '600' },
+  statText: { fontSize: 14, color: '#34495e', marginBottom: 4, fontWeight: '700' },
   itemRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
