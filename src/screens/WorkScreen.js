@@ -14,19 +14,21 @@ export default function WorkScreen() {
     dispatch({ type: 'WORK' });
   };
 
-  const handleCollectSalary = () => {
-    dispatch({ type: 'COLLECT_SALARY' });
-  };
-
   let statusText, statusStyle;
+  const energy = state.energy ?? 100;
+  const stress = state.stress ?? 0;
+  const canWork = energy >= 20 && stress <= 80;
+
   if (!state.hasWorked) {
-    statusText = '💼 Çalışmaya hazırsınız. Çalış butonuna basın!';
-    statusStyle = styles.statusWaiting;
-  } else if (!state.hasPaid) {
-    statusText = '🎉 Harika! Çalışmanız tamamlandı. Maaşınızı alabilirsiniz!';
-    statusStyle = styles.statusReady;
+    if (!canWork) {
+      statusText = '🚫 Enerjiniz çok düşük veya stresiniz çok yüksek! Marketten yiyecek/eğlence alarak kendinize gelin.';
+      statusStyle = styles.statusError;
+    } else {
+      statusText = '💼 Çalışmaya hazırsınız. Bu ayki mesainizi tamamlamak için butona tıklayın!';
+      statusStyle = styles.statusWaiting;
+    }
   } else {
-    statusText = '✅ Bu ay çalıştınız ve maaşınızı aldınız. İyi harcamalar!';
+    statusText = '✅ Bu ayki mesainizi tamamladınız. Maaşınız ay sonunda yatar.';
     statusStyle = styles.statusDone;
   }
 
@@ -57,34 +59,29 @@ export default function WorkScreen() {
           <Text style={styles.statusText}>{statusText}</Text>
         </View>
 
+        {/* Rastgele Olay Mesajı */}
+        {state.lastEvent && (
+          <View style={styles.eventBox}>
+            <Text style={styles.eventText}>{state.lastEvent}</Text>
+          </View>
+        )}
+
         {/* Çalış butonu */}
         <TouchableOpacity
-          style={[styles.workBtn, state.hasWorked && styles.btnDisabled]}
+          style={[styles.workBtn, (state.hasWorked || !canWork) && styles.btnDisabled]}
           onPress={handleWork}
-          disabled={state.hasWorked}
+          disabled={state.hasWorked || !canWork}
           activeOpacity={0.7}
         >
           <Text style={styles.workBtnText}>
-            {state.hasWorked ? '✅ Çalışma Tamamlandı' : '🔨 Çalış'}
+            {state.hasWorked ? '✅ Bu Ay Çalışıldı' : '🔨 Bu Ay Çalış'}
           </Text>
         </TouchableOpacity>
 
-        {/* Maaş al butonu */}
-        <TouchableOpacity
-          style={[
-            styles.salaryBtn,
-            (!state.hasWorked || state.hasPaid) ? styles.btnDisabled : styles.salaryBtnActive,
-          ]}
-          onPress={handleCollectSalary}
-          disabled={!state.hasWorked || state.hasPaid}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.salaryBtnText}>
-            {state.hasPaid
-              ? `✅ Maaş Alındı (${formatMoney(state.salary)} TL)`
-              : `💰 Maaşı Al (${formatMoney(state.salary)} TL)`}
-          </Text>
-        </TouchableOpacity>
+        {/* Bilgi Mesajı */}
+        <View style={styles.infoBox}>
+          <Text style={styles.infoText}>💡 Maaşınız ay sonu (30. Gün bitiminde) otomatik olarak bakiyenize eklenir. Maaşı almak için ay içinde bir kez mesai yapmanız yeterlidir.</Text>
+        </View>
       </View>
 
       {/* İstatistikler */}
@@ -116,9 +113,9 @@ const styles = StyleSheet.create({
   container: { paddingHorizontal: 16 },
   workCard: {
     backgroundColor: '#eafaf1',
-    borderRadius: 24,
-    padding: 24,
-    marginBottom: 16,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: 'rgba(46,204,113,0.15)',
     shadowColor: '#000',
@@ -131,36 +128,52 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    marginBottom: 20,
+    gap: 6,
+    marginBottom: 16,
   },
-  titleIcon: { fontSize: 22 },
-  titleText: { fontSize: 22, fontWeight: '900', color: '#2c3e50' },
+  titleIcon: { fontSize: 18 },
+  titleText: { fontSize: 18, fontWeight: '900', color: '#2c3e50' },
   jobInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 20,
-    marginBottom: 20,
+    gap: 16,
+    marginBottom: 16,
   },
   jobInfoItem: { alignItems: 'center' },
-  jobInfoLabel: { fontSize: 11, fontWeight: '600', color: '#7f8c8d' },
-  jobInfoValue: { fontSize: 15, fontWeight: '800', color: '#2c3e50' },
-  divider: { width: 1, height: 30, backgroundColor: 'rgba(0,0,0,0.1)' },
+  jobInfoLabel: { fontSize: 10, fontWeight: '600', color: '#7f8c8d' },
+  jobInfoValue: { fontSize: 14, fontWeight: '800', color: '#2c3e50' },
+  divider: { width: 1, height: 24, backgroundColor: 'rgba(0,0,0,0.1)' },
   statusBox: {
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 20,
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 16,
     alignItems: 'center',
   },
   statusWaiting: { backgroundColor: 'rgba(243,156,18,0.1)' },
   statusReady: { backgroundColor: 'rgba(46,204,113,0.1)' },
   statusDone: { backgroundColor: 'rgba(0,0,0,0.05)' },
-  statusText: { fontSize: 14, fontWeight: '700', color: '#2c3e50', textAlign: 'center', lineHeight: 20 },
+  statusError: { backgroundColor: 'rgba(231,76,60,0.1)' },
+  statusText: { fontSize: 13, fontWeight: '700', color: '#2c3e50', textAlign: 'center', lineHeight: 18 },
+  eventBox: {
+    backgroundColor: '#fff3cd',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ffc107'
+  },
+  eventText: { fontSize: 12, fontWeight: '600', color: '#856404' },
+  infoBox: {
+    padding: 10, backgroundColor: 'rgba(52, 152, 219, 0.1)', borderRadius: 8, marginTop: 4,
+  },
+  infoText: {
+    fontSize: 11, color: '#2980b9', fontWeight: '600', lineHeight: 16,
+  },
   workBtn: {
     backgroundColor: '#2ecc71',
-    paddingVertical: 16,
-    borderRadius: 50,
+    paddingVertical: 12,
+    borderRadius: 12,
     alignItems: 'center',
     marginBottom: 10,
     shadowColor: '#2ecc71',
@@ -169,26 +182,12 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
   },
-  workBtnText: { color: 'white', fontWeight: '800', fontSize: 16 },
-  salaryBtn: {
-    paddingVertical: 16,
-    borderRadius: 50,
-    alignItems: 'center',
-  },
-  salaryBtnActive: {
-    backgroundColor: '#3498db',
-    shadowColor: '#3498db',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  salaryBtnText: { color: 'white', fontWeight: '800', fontSize: 17 },
+  workBtnText: { color: 'white', fontWeight: '800', fontSize: 14 },
   btnDisabled: { backgroundColor: '#bdc3c7', shadowOpacity: 0, elevation: 0 },
   statsCard: {
     backgroundColor: 'rgba(255,255,255,0.88)',
     borderRadius: 16,
-    padding: 16,
+    padding: 12,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.5)',
     shadowColor: '#000',
@@ -197,11 +196,11 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  statsTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  statsIcon: { fontSize: 16 },
-  statsTitle: { fontSize: 15, fontWeight: '800', color: '#2c3e50' },
-  statRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 },
+  statsTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  statsIcon: { fontSize: 14 },
+  statsTitle: { fontSize: 14, fontWeight: '800', color: '#2c3e50' },
+  statRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 },
   statRowBorder: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(0,0,0,0.06)' },
-  statLabel: { fontSize: 13, fontWeight: '600', color: '#7f8c8d' },
-  statValue: { fontSize: 13, fontWeight: '800' },
+  statLabel: { fontSize: 12, fontWeight: '600', color: '#7f8c8d' },
+  statValue: { fontSize: 12, fontWeight: '800' },
 });

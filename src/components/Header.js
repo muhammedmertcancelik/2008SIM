@@ -22,7 +22,7 @@ export default function Header() {
       <View style={styles.dateBadge}>
         <Text style={styles.dateIcon}>📅</Text>
         <View style={styles.dateTextBlock}>
-          <Text style={styles.monthText}>{getMonthName()}</Text>
+          <Text style={styles.monthText}>{getMonthName()} ({state.day}. Gün)</Text>
           <Text style={styles.dateYearText}>{state.year}</Text>
         </View>
       </View>
@@ -68,30 +68,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     backgroundColor: 'rgba(255,255,255,0.88)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
   dateIcon: {
-    fontSize: 16,
+    fontSize: 14,
   },
   dateTextBlock: {
     alignItems: 'center',
   },
   monthText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#2c3e50',
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#34495e',
+    textTransform: 'uppercase',
   },
   dateYearText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
     color: '#7f8c8d',
   },
@@ -99,15 +95,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: '#2ecc71',
-    shadowColor: '#2ecc71',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: '#e8f6ef',
   },
   balanceIcon: {
     fontSize: 16,

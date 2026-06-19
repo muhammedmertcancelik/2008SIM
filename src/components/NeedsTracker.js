@@ -50,10 +50,10 @@ export default function NeedsTracker() {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: 'rgba(255,255,255,0.88)',
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: 16,
+    padding: 12,
     marginHorizontal: 16,
-    marginBottom: 12,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.5)',
     shadowColor: '#000',
@@ -65,21 +65,21 @@ const styles = StyleSheet.create({
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
+    gap: 6,
+    marginBottom: 10,
   },
   titleIcon: {
-    fontSize: 20,
+    fontSize: 16,
   },
   titleText: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '800',
     color: '#2c3e50',
   },
   needItem: {
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 10,
+    padding: 8,
+    borderRadius: 10,
+    marginBottom: 6,
   },
   needHeader: {
     flexDirection: 'row',
@@ -87,12 +87,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   needLabel: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
     color: '#2c3e50',
   },
   needValue: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '800',
   },
   progressBg: {

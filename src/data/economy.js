@@ -16,7 +16,7 @@ export const ECONOMY = {
   },
 
   salary: {
-    baseSalary: 900,
+    baseSalary: 550,
     annualRaisePercent: 8,
     raiseMonth: 0,
   },

@@ -89,6 +89,9 @@ export const PRODUCTS = [
   { id: 'oyun', name: 'Bilgisayar Oyunu', emoji: '🎮', category: 'Eğlence', subcategory: 'Hobi', price: 15.00, needContribution: 0, unit: 'adet' },
   { id: 'konser', name: 'Konser Bileti', emoji: '🎤', category: 'Eğlence', subcategory: 'Aktivite', price: 25.00, needContribution: 0, unit: 'bilet' },
   { id: 'futbol', name: 'Maç Bileti', emoji: '⚽', category: 'Eğlence', subcategory: 'Aktivite', price: 20.00, needContribution: 0, unit: 'bilet' },
+  { id: 'tuslu_tel', name: 'Nokia Tuşlu Telefon', emoji: '📱', category: 'Eğlence', subcategory: 'Teknoloji', price: 250.00, needContribution: 0, unit: 'adet', maxYear: 2010 },
+  { id: 'akilli_tel', name: 'Akıllı Telefon', emoji: '📲', category: 'Eğlence', subcategory: 'Teknoloji', price: 1500.00, needContribution: 0, unit: 'adet', minYear: 2011 },
+  { id: 'maske', name: 'Cerrahi Maske (50\'li)', emoji: '😷', category: 'Eğlence', subcategory: 'Sağlık', price: 50.00, needContribution: 0, unit: 'kutu', minYear: 2020 },
 
   // ---- KİRA ----
   { id: 'studyo', name: 'Stüdyo Daire', emoji: '🏠', category: 'Kira', subcategory: 'Konut', price: 300.00, needContribution: 450, unit: 'ay' },
@@ -107,7 +110,7 @@ export const CATEGORIES = ['Yiyecek', 'Ulaşım', 'Eğlence', 'Kira'];
 export const SUBCATEGORIES = {
   Yiyecek: ['Tümü', 'Temel Gıda', 'Sebze & Meyve', 'Et & Balık', 'Baklagiller', 'Baharat & Sos', 'İçecekler', 'Atıştırmalık', 'Dışarıda Yemek'],
   'Ulaşım': ['Tümü', 'Toplu Taşıma', 'Özel', 'Yakıt'],
-  'Eğlence': ['Tümü', 'Aktivite', 'Hobi'],
+  'Eğlence': ['Tümü', 'Aktivite', 'Hobi', 'Teknoloji', 'Sağlık'],
   Kira: ['Tümü', 'Konut'],
 };
 
