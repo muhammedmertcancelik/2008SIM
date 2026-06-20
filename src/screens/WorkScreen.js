@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
-import { BlurView } from 'expo-blur';
+import GlassView from '../components/GlassView';
 import { useGame } from '../state/GameContext';
 import { formatMoney, formatMoneyFull } from '../utils/formatter';
 import { JOBS, JOB_CATEGORIES } from '../data/jobs';
@@ -10,56 +10,42 @@ export default function WorkScreen() {
   const [activeTab, setActiveTab] = useState('MY_JOB'); // 'MY_JOB' or 'MARKET'
 
   const handleWork = () => {
-    dispatch({ type: 'WORK' });
+    dispatch({ type: 'WORK_ACTION' });
   };
 
   const handleApply = (job) => {
     if (state.job === job.title) {
-      Alert.alert('Hata', 'Zaten bu işte çalışıyorsun.');
+      dispatch({ type: 'SHOW_ALERT', payload: { title: 'Hata', message: 'Zaten bu işte çalışıyorsun.' } });
       return;
     }
     const jobLevel = state.hiddenStats?.levels?.job || 1;
     if (job.requiredLevel && jobLevel < job.requiredLevel) {
-      Alert.alert('Yetersiz Seviye', `Bu iş için İş Seviyenin en az ${job.requiredLevel} olması gerekiyor.`);
+      dispatch({ type: 'SHOW_ALERT', payload: { title: 'Yetersiz Seviye', message: `Bu iş için İş Seviyenin en az ${job.requiredLevel} olması gerekiyor.` } });
       return;
     }
     if (job.requiredSkill && !(state.skills || []).includes(job.requiredSkill)) {
-      Alert.alert('Eksik Eğitim', `Bu işe girmek için gerekli eğitimi/sertifikayı almadın.`);
+      dispatch({ type: 'SHOW_ALERT', payload: { title: 'Eksik Eğitim', message: `Bu işe girmek için gerekli eğitimi/sertifikayı almadın.` } });
       return;
     }
 
-    Alert.alert(
-      'İşe Gir',
-      `${job.title} işine girmek istiyor musun? Eski işinden ayrılacaksın.`,
-      [
-        { text: 'Vazgeç', style: 'cancel' },
-        { 
-          text: 'Kabul Et', 
-          onPress: () => {
-            dispatch({ type: 'CHANGE_JOB', payload: { job } });
-            Alert.alert('Hayırlı Olsun!', 'Yeni işinize başladınız.');
-            setActiveTab('MY_JOB');
-          }
-        }
-      ]
-    );
+    dispatch({
+      type: 'SHOW_CONFIRM',
+      payload: {
+        title: 'İşe Gir',
+        message: `${job.title} işine girmek istiyor musun? Eski işinden ayrılacaksın.`,
+        onConfirm: () => {
+          dispatch({ type: 'CHANGE_JOB', payload: { job } });
+          dispatch({ type: 'SHOW_ALERT', payload: { title: 'Hayırlı Olsun!', message: 'Yeni işinize başladınız.' } });
+          setActiveTab('MY_JOB');
+          dispatch({ type: 'HIDE_CONFIRM' });
+        },
+        onCancel: () => dispatch({ type: 'HIDE_CONFIRM' })
+      }
+    });
   };
 
   const handleResign = () => {
-    Alert.alert(
-      'İstifa Et',
-      'Gerçekten istifa etmek istiyor musun? İşsiz kalacaksın.',
-      [
-        { text: 'Vazgeç', style: 'cancel' },
-        { 
-          text: 'İstifa Et', 
-          style: 'destructive',
-          onPress: () => {
-            dispatch({ type: 'CHANGE_JOB', payload: { job: null } });
-          }
-        }
-      ]
-    );
+    dispatch({ type: 'SHOW_CONFIRM', payload: { title: 'İstifa Et', message: 'Gerçekten istifa etmek istiyor musun? İşsiz kalacaksın.', onConfirm: () => { dispatch({ type: 'CHANGE_JOB', payload: { job: null } }); dispatch({ type: 'HIDE_CONFIRM' }); }, onCancel: () => dispatch({ type: 'HIDE_CONFIRM' }) } });
   };
 
   const renderMyJob = () => {
@@ -75,13 +61,13 @@ export default function WorkScreen() {
 
     if (state.job === 'İşsiz') {
       return (
-        <BlurView intensity={20} tint="dark" style={styles.workCard}>
+        <GlassView intensity={20} tint="dark" style={styles.workCard}>
           <Text style={styles.unemployedIcon}>🤷‍♂️</Text>
           <Text style={styles.unemployedTitle}>Şu An İşsizsin</Text>
           <Text style={styles.unemployedDesc}>
             Para kazanmak için bir işe girmelisin. Yukarıdan "İş İlanları" sekmesine tıklayarak kendine uygun bir iş bulabilirsin.
           </Text>
-        </BlurView>
+        </GlassView>
       );
     }
 
@@ -100,7 +86,7 @@ export default function WorkScreen() {
 
     return (
       <View>
-        <BlurView intensity={30} tint="dark" style={styles.workCard}>
+        <GlassView intensity={30} tint="dark" style={styles.workCard}>
           <View style={styles.titleRow}>
             <Text style={styles.titleIcon}>{currentJobData ? currentJobData.icon : '💼'}</Text>
             <Text style={styles.titleText}>{state.job}</Text>
@@ -108,8 +94,8 @@ export default function WorkScreen() {
 
           <View style={styles.jobDetailBox}>
             <View style={styles.jobDetailItem}>
-              <Text style={styles.jobDetailLabel}>Aylık Maaş</Text>
-              <Text style={styles.jobDetailValue}>{formatMoneyFull(state.salary)}</Text>
+              <Text style={styles.jobDetailLabel}>Günlük Yevmiye</Text>
+              <Text style={styles.jobDetailValue}>{formatMoneyFull(Math.round(state.salary / 30))}</Text>
             </View>
             <View style={styles.divider} />
             <View style={styles.jobDetailItem}>
@@ -128,12 +114,12 @@ export default function WorkScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.workBtn, (state.hasWorked || !canWork) && styles.btnDisabled]}
+            style={[styles.workBtn, (!canWork || state.dailyActionCompleted) && styles.btnDisabled]}
             onPress={handleWork}
-            disabled={state.hasWorked || !canWork}
+            disabled={!canWork || state.dailyActionCompleted}
           >
             <Text style={styles.workBtnText}>
-              {state.hasWorked ? '✅ Bu Ay Çalışıldı' : '🔨 MESAİYE BAŞLA'}
+              {state.dailyActionCompleted ? '✅ Bugün Efor Harcadın' : '🔨 MESAİYE BAŞLA'}
             </Text>
           </TouchableOpacity>
 
@@ -141,11 +127,11 @@ export default function WorkScreen() {
             <Text style={styles.resignBtnText}>İstifa Et</Text>
           </TouchableOpacity>
 
-        </BlurView>
+        </GlassView>
 
         {/* İstatistikler */}
         {state.stats.monthsPlayed > 0 && (
-          <BlurView intensity={20} tint="dark" style={styles.statsCard}>
+          <GlassView intensity={20} tint="dark" style={styles.statsCard}>
             <View style={styles.statsTitleRow}>
               <Text style={styles.statsIcon}>📋</Text>
               <Text style={styles.statsTitle}>İş İstatistikleri</Text>
@@ -154,7 +140,7 @@ export default function WorkScreen() {
               <Text style={styles.statLabel}>Toplam Kazanç</Text>
               <Text style={[styles.statValue, { color: '#2ecc71' }]}>{formatMoneyFull(state.stats.totalEarned)}</Text>
             </View>
-          </BlurView>
+          </GlassView>
         )}
       </View>
     );
@@ -167,7 +153,7 @@ export default function WorkScreen() {
           const category = JOB_CATEGORIES[job.categoryId];
           const isCurrent = state.currentJobId === job.id;
           return (
-            <BlurView intensity={25} tint="dark" style={styles.jobCard} key={job.id}>
+            <GlassView intensity={25} tint="dark" style={styles.jobCard} key={job.id}>
               <View style={styles.jobHeader}>
                 <View style={styles.jobIconBox}>
                   <Text style={styles.jobIcon}>{job.icon}</Text>
@@ -199,7 +185,7 @@ export default function WorkScreen() {
               </View>
 
               {isCurrent ? (
-                <View style={[styles.applyBtn, { backgroundColor: 'rgba(46, 204, 113, 0.2)' }]}>
+                <View style={[styles.applyBtn, { backgroundColor: 'rgba(46, 204, 113, 0.6)' }]}>
                   <Text style={[styles.applyBtnText, { color: '#2ecc71' }]}>Mevcut İşin</Text>
                 </View>
               ) : (
@@ -207,7 +193,7 @@ export default function WorkScreen() {
                   <Text style={styles.applyBtnText}>BAŞVUR</Text>
                 </TouchableOpacity>
               )}
-            </BlurView>
+            </GlassView>
           );
         })}
       </View>
@@ -298,8 +284,8 @@ const styles = StyleSheet.create({
   statusError: { backgroundColor: 'rgba(231, 76, 60, 0.1)', borderColor: 'rgba(231, 76, 60, 0.3)' },
   statusText: { color: '#ecf0f1', fontSize: 13, textAlign: 'center', fontWeight: '600' },
 
-  workBtn: { backgroundColor: 'rgba(46, 204, 113, 0.2)', paddingVertical: 16, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#2ecc71' },
-  btnDisabled: { backgroundColor: 'rgba(0, 0, 0, 0.3)', borderColor: 'transparent' },
+  workBtn: { backgroundColor: 'rgba(46, 204, 113, 0.6)', paddingVertical: 16, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#2ecc71' },
+  btnDisabled: { backgroundColor: 'rgba(0, 0, 0, 0.5)', borderColor: 'transparent' },
   workBtnText: { color: 'white', fontWeight: '900', fontSize: 16 },
 
   resignBtn: { marginTop: 16, paddingVertical: 12, alignItems: 'center' },
@@ -341,6 +327,6 @@ const styles = StyleSheet.create({
   reqBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(52, 152, 219, 0.3)', backgroundColor: 'rgba(52, 152, 219, 0.1)' },
   reqBadgeText: { fontSize: 11, fontWeight: '800', color: '#3498db' },
 
-  applyBtn: { paddingVertical: 12, borderRadius: 16, alignItems: 'center', backgroundColor: 'rgba(255, 205, 163, 0.1)', borderWidth: 1, borderColor: 'rgba(255, 205, 163, 0.3)' },
+  applyBtn: { paddingVertical: 12, borderRadius: 16, alignItems: 'center', backgroundColor: 'rgba(255, 205, 163, 0.4)', borderWidth: 1, borderColor: 'rgba(255, 205, 163, 0.6)' },
   applyBtnText: { color: '#ffcda3', fontWeight: '800', fontSize: 14 },
 });

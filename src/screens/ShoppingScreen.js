@@ -3,6 +3,7 @@
 // ============================================
 
 import React, { useState, useMemo } from 'react';
+import GlassView from '../components/GlassView';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { useGame } from '../state/GameContext';
 import { CATEGORIES, SUBCATEGORIES } from '../data/products';
@@ -31,7 +32,7 @@ export default function ShoppingScreen() {
 
   const handleBuy = (product, amount = 1) => {
     if (product.price * amount > state.money) {
-      setAlertMsg(`Bu üründen ${amount} adet almak için yeterli paranız yok.`);
+      dispatch({ type: 'SHOW_ALERT', payload: { title: 'Yetersiz Bakiye', message: `Bu üründen ${amount} adet almak için yeterli paranız yok.` } });
       return;
     }
     dispatch({ type: 'BUY_PRODUCT', payload: { product, amount } });
@@ -55,7 +56,7 @@ export default function ShoppingScreen() {
       <NeedsTracker />
 
       {/* Market Başlığı */}
-      <View style={styles.marketHeader}>
+      <GlassView intensity={30} tint='dark' style={styles.marketHeader}>
         <View style={styles.marketTitleRow}>
           <Text style={styles.marketTitle}>🛒 {state.year} Market</Text>
           <Text style={styles.productCount}>{filteredProducts.length} ürün</Text>
@@ -63,16 +64,19 @@ export default function ShoppingScreen() {
 
         {/* Kategoriler */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryRow}>
-          {CATEGORIES.map(cat => (
+          {CATEGORIES.map(catObj => {
+            const catKey = catObj.tr;
+            const catDisplay = state.language === 'en' ? catObj.en : catObj.tr;
+            return (
             <TouchableOpacity
-              key={cat}
-              style={[styles.categoryPill, cat === category && styles.categoryPillActive]}
-              onPress={() => handleCategoryChange(cat)}
+              key={catKey}
+              style={[styles.categoryPill, catKey === category && styles.categoryPillActive]}
+              onPress={() => handleCategoryChange(catKey)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.categoryText, cat === category && styles.categoryTextActive]}>{cat}</Text>
+              <Text style={[styles.categoryText, catKey === category && styles.categoryTextActive]}>{catDisplay}</Text>
             </TouchableOpacity>
-          ))}
+          )})}
         </ScrollView>
 
         {/* Arama & Sıralama */}
@@ -130,7 +134,7 @@ export default function ShoppingScreen() {
                 const canAfford1 = state.money >= item.price;
                 const canAfford5 = state.money >= (item.price * 5);
                 return (
-                  <View key={item.id} style={styles.productCard}>
+                  <GlassView intensity={30} tint='dark' key={item.id} style={styles.productCard}>
                     <Text style={styles.productEmoji}>{item.emoji}</Text>
                     <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
                     <Text style={styles.productCategory}>{item.subcategory}</Text>
@@ -163,106 +167,4 @@ export default function ShoppingScreen() {
       )}
 
       {/* Alert Modal */}
-      {alertMsg && (
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Yetersiz Bakiye</Text>
-            <Text style={styles.modalText}>{alertMsg}</Text>
-            <TouchableOpacity 
-              style={styles.modalChoiceBtn} 
-              onPress={() => setAlertMsg(null)}
-            >
-              <Text style={styles.modalChoiceText}>Tamam</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: { },
-  marketHeader: {
-    backgroundColor: 'rgba(243, 156, 18, 0.12)',
-    borderRadius: 16,
-    padding: 12,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(243, 156, 18, 0.25)',
-  },
-  marketTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  marketTitle: { fontSize: 16, fontWeight: '900', color: '#ecf0f1' },
-  productCount: { fontSize: 12, fontWeight: '600', color: '#95a5a6' },
-  categoryRow: { flexDirection: 'row', marginBottom: 8 },
-  categoryPill: {
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 50,
-    backgroundColor: '#34495e', marginRight: 6,
-  },
-  categoryPillActive: { backgroundColor: '#f39c12', shadowColor: '#f39c12', shadowOpacity: 0.3, elevation: 3 },
-  categoryText: { fontSize: 12, fontWeight: '700', color: '#7f8c8d' },
-  categoryTextActive: { color: 'white' },
-  searchRow: { flexDirection: 'row', gap: 6, marginBottom: 8 },
-  searchBox: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#34495e', borderRadius: 50, paddingHorizontal: 10, paddingVertical: 6,
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.1)',
-  },
-  searchIcon: { fontSize: 14 },
-  searchInput: { flex: 1, fontSize: 14, fontWeight: '600', color: '#ecf0f1', padding: 0 },
-  sortBtn: {
-    width: 38, height: 38, borderRadius: 10, backgroundColor: '#34495e',
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.1)',
-  },
-  sortBtnActive: { backgroundColor: '#2ecc71', borderColor: '#2ecc71' },
-  sortBtnText: { fontSize: 16, fontWeight: '700', color: '#7f8c8d' },
-  sortBtnTextActive: { color: 'white' },
-  subcategoryRow: { flexDirection: 'row' },
-  subcategoryPill: {
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 50,
-    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.1)', backgroundColor: '#34495e', marginRight: 6,
-  },
-  subcategoryPillActive: { backgroundColor: '#ecf0f1', borderColor: '#ecf0f1' },
-  subcategoryText: { fontSize: 11, fontWeight: '600', color: '#95a5a6' },
-  subcategoryTextActive: { color: '#2c3e50' },
-  productGrid: { paddingHorizontal: 16, paddingBottom: 16 },
-  productRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  productCard: {
-    width: '48%', backgroundColor: 'rgba(243, 156, 18, 0.08)',
-    borderRadius: 12, padding: 10, alignItems: 'center',
-    borderWidth: 1, borderColor: 'rgba(243, 156, 18, 0.2)',
-  },
-  productCardEmpty: { width: '48%' },
-  productEmoji: { fontSize: 28, marginBottom: 4 },
-  productName: { fontSize: 13, fontWeight: '700', color: '#ecf0f1', textAlign: 'center', marginBottom: 2 },
-  productCategory: { fontSize: 10, color: '#95a5a6', marginBottom: 4 },
-  productPrice: { fontSize: 14, fontWeight: '800', color: '#f39c12', marginBottom: 8 },
-  buyBtnRow: { flexDirection: 'row', width: '100%', gap: 4 },
-  buyBtn: {
-    backgroundColor: '#f39c12', paddingVertical: 6, borderRadius: 50, flex: 1, alignItems: 'center',
-  },
-  buyBtnBulk: { backgroundColor: '#d35400' },
-  buyBtnDisabled: { backgroundColor: '#bdc3c7' },
-  buyBtnText: { color: 'white', fontWeight: '700', fontSize: 13 },
-  emptyState: { alignItems: 'center', paddingVertical: 40 },
-  emptyIcon: { fontSize: 48, marginBottom: 8 },
-  emptyText: { fontSize: 15, fontWeight: '600', color: '#7f8c8d' },
-  modalOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center', alignItems: 'center', zIndex: 999,
-  },
-  modalContent: {
-    backgroundColor: 'white', width: '85%', borderRadius: 16, padding: 16,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.3, shadowRadius: 20, elevation: 10,
-    alignItems: 'center'
-  },
-  modalTitle: { fontSize: 16, fontWeight: '800', color: '#e74c3c', marginBottom: 8 },
-  modalText: { fontSize: 13, color: '#34495e', lineHeight: 18, marginBottom: 16, textAlign: 'center', fontWeight: '500' },
-  modalChoiceBtn: {
-    backgroundColor: '#3498db', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 10, alignItems: 'center', width: '100%'
-  },
-  modalChoiceText: { color: 'white', fontWeight: '700', fontSize: 13, textAlign: 'center' },
-});
+      ;

@@ -16,7 +16,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
+import GlassView from './src/components/GlassView';
 import { GameProvider, useGame } from './src/state/GameContext';
 import { SoundManager } from './src/utils/SoundManager';
 import Header from './src/components/Header';
@@ -31,7 +31,11 @@ import CityScreen from './src/screens/CityScreen';
 import QuestScreen from './src/screens/QuestScreen';
 
 import CharacterCreationScreen from './src/screens/CharacterCreationScreen';
-import DiaryScreen from './src/screens/DiaryScreen';
+import DiaryScreen from './src/screens/DiaryScreen'; // Bu artık BookScreen
+import WelcomeScreen from './src/screens/WelcomeScreen';
+import GameOverScreen from './src/screens/GameOverScreen';
+import ChapterIntroModal from './src/components/ChapterIntroModal';
+import TutorialOverlay from './src/components/TutorialOverlay';
 
 const TABS = [
   { id: 'shopping', label: 'Alışveriş', icon: '🛒' },
@@ -41,12 +45,13 @@ const TABS = [
   { id: 'life', label: 'Hayat', icon: '🏠' },
   { id: 'investment', label: 'Borsa', icon: '📈' },
   { id: 'quests', label: 'Görevler', icon: '🎯' },
-  { id: 'diary', label: 'Günlük', icon: '📖' },
+  { id: 'diary', label: 'Kitabım', icon: '📖' },
 ];
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState('shopping');
-  const [confirmDialog, setConfirmDialog] = useState(null);
+  
+  const [showWelcome, setShowWelcome] = useState(true);
   const { state, dispatch, allNeedsMet, getMonthName, advanceTimeAsync } = useGame();
 
   React.useEffect(() => {
@@ -72,6 +77,56 @@ function AppContent() {
     );
   }
 
+  if (showWelcome) {
+    return (
+      <>
+        <WelcomeScreen 
+          onContinue={() => setShowWelcome(false)}
+          onNewGame={() => {
+            if (state.isCharacterCreated) {
+              dispatch({ type: 'SHOW_CONFIRM', payload: {
+                title: '🔄 Yeni Oyun',
+                message: 'Mevcut oyununuz silinecek ve yeni bir oyun başlatılacak. Emin misiniz?',
+                onConfirm: () => {
+                  dispatch({ type: 'NEW_GAME' });
+                  setShowWelcome(false);
+                  dispatch({ type: 'HIDE_CONFIRM' });
+                },
+                onCancel: () => dispatch({ type: 'HIDE_CONFIRM' })
+              }});
+            } else {
+              dispatch({ type: 'NEW_GAME' });
+              setShowWelcome(false);
+            }
+          }}
+        />
+        {/* Confirm Modal */}
+        {state.confirmDialog && !state.currentEvent && (
+          <View style={styles.modalOverlay}>
+            <GlassView intensity={80} tint="dark" style={styles.modalContent}>
+              <Text style={styles.modalTitle}>{state.confirmDialog.title}</Text>
+              <Text style={styles.modalText}>{state.confirmDialog.message}</Text>
+              <View style={{flexDirection: 'row', gap: 12}}>
+                <TouchableOpacity 
+                  style={[styles.modalChoiceBtn, {flex: 1, backgroundColor: '#7f8c8d'}]} 
+                  onPress={state.confirmDialog.onCancel}
+                >
+                  <Text style={styles.modalChoiceText}>İptal</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.modalChoiceBtn, {flex: 1, backgroundColor: '#2ecc71'}]} 
+                  onPress={state.confirmDialog.onConfirm}
+                >
+                  <Text style={styles.modalChoiceText}>Onayla</Text>
+                </TouchableOpacity>
+              </View>
+            </GlassView>
+          </View>
+        )}
+      </>
+    );
+  }
+
   if (!state.isCharacterCreated) {
     return (
       <CharacterCreationScreen 
@@ -82,40 +137,67 @@ function AppContent() {
     );
   }
 
+  if (state.isGameOver) {
+    return (
+      <GameOverScreen 
+        onNewGame={() => {
+          dispatch({ type: 'NEW_GAME' });
+        }}
+      />
+    );
+  }
+
+  if (state.pendingChapterIntro !== null) {
+    return (
+      <ChapterIntroModal
+        chapterIndex={state.pendingChapterIntro}
+        onDismiss={() => {
+          dispatch({ type: 'MARK_CHAPTER_SEEN', payload: state.pendingChapterIntro });
+        }}
+      />
+    );
+  }
+
   const handleAdvanceTime = (days) => {
     SoundManager.playClick();
     if (state.day + days > 30 && !allNeedsMet) {
-      if (Platform.OS !== 'web') {
-        Alert.alert('Eksik İhtiyaçlar', 'Aya geçmeden önce tüm ihtiyaçlarınızı (Yiyecek, Kira, Ulaşım) karşılamalısınız.');
-      } else {
-        alert('Eksik İhtiyaçlar: Aya geçmeden önce tüm ihtiyaçlarınızı (Yiyecek, Kira, Ulaşım) karşılamalısınız.');
-      }
+      dispatch({ type: 'SHOW_ALERT', payload: { title: 'Eksik İhtiyaçlar', message: 'Aya geçmeden önce tüm ihtiyaçlarınızı (Yiyecek, Kira, Ulaşım) karşılamalısınız.' } });
+      return;
+    }
+
+    if (!state.dailyActionCompleted) {
+      dispatch({ type: 'SHOW_ALERT', payload: { title: 'Günü Bitiremezsin', message: 'Bugün hiçbir şey yapmadın. Zamanı ilerletmeden önce çalışmalı, kuryelik yapmalı veya bir karakterle görüşmelisin.' } });
+      return;
+    }
+
+    if (days === 7) {
+      dispatch({ type: 'SHOW_ALERT', payload: { title: 'Hata', message: 'Artık her gün için zorunlu efor harcaman gerektiği için 7 gün atlayamazsın. Gün gün ilerlemelisin.' } });
       return;
     }
 
     const label = days === 1 ? '1 Gün' : '7 Gün';
-    setConfirmDialog({
+    dispatch({ type: 'SHOW_CONFIRM', payload: {
       title: 'Zaman İlerlemesi',
       message: `${label} ilerlemek istiyor musunuz?`,
       onConfirm: () => {
         advanceTimeAsync(days);
-        setConfirmDialog(null);
+        dispatch({ type: 'HIDE_CONFIRM' });
       },
-      onCancel: () => setConfirmDialog(null)
-    });
+      onCancel: () => dispatch({ type: 'HIDE_CONFIRM' })
+    }});
   };
 
   const handleNewGame = () => {
     SoundManager.playClick();
-    setConfirmDialog({
+    dispatch({ type: 'SHOW_CONFIRM', payload: {
       title: '🔄 Yeni Oyun',
       message: 'Mevcut oyununuz silinecek ve yeni bir oyun başlatılacak. Emin misiniz?',
       onConfirm: () => {
         dispatch({ type: 'NEW_GAME' });
-        setConfirmDialog(null);
+        dispatch({ type: 'HIDE_CONFIRM' });
       },
-      onCancel: () => setConfirmDialog(null)
-    });
+      onCancel: () => dispatch({ type: 'HIDE_CONFIRM' })
+    }});
   };
 
   const getRemainingNeeds = () => {
@@ -177,7 +259,7 @@ function AppContent() {
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
         {/* ÜST BÖLÜM (Sabit) - GLASSMORPHISM */}
-        <BlurView intensity={50} tint="dark" style={styles.topSection}>
+        <GlassView intensity={50} tint="dark" style={styles.topSection}>
           <Header />
           <ProfileCard />
           
@@ -190,15 +272,7 @@ function AppContent() {
                 disabled={state.day + 1 > 30 && !allNeedsMet}
                 activeOpacity={0.7}
               >
-                <Text style={styles.advanceBtnText}>+1 Gün</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.advanceBtn, (state.day + 7 <= 30 || allNeedsMet) ? styles.advanceBtnActive : styles.advanceBtnDisabled]}
-                onPress={() => handleAdvanceTime(7)}
-                disabled={state.day + 7 > 30 && !allNeedsMet}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.advanceBtnText}>+7 Gün</Text>
+                <Text style={styles.advanceBtnText}>Günü Bitir</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.newGameBtn} onPress={handleNewGame} activeOpacity={0.7}>
                 <Text style={styles.newGameBtnText}>🔄</Text>
@@ -210,7 +284,7 @@ function AppContent() {
                 : (allNeedsMet ? '✅ Tüm ihtiyaçlar karşılandı.' : `⏳ Eksik: ${getRemainingNeeds().join(', ')}`)}
             </Text>
           </View>
-        </BlurView>
+        </GlassView>
 
         {/* ORTA BÖLÜM (Kaydırılabilir İçerik) */}
         <ScrollView
@@ -225,7 +299,7 @@ function AppContent() {
 
         {/* ALT BÖLÜM (Sabit Tab Bar) - GLASSMORPHISM */}
         <View style={styles.tabContainer}>
-          <BlurView intensity={70} tint="dark" style={styles.bottomTabBar}>
+          <GlassView intensity={70} tint="dark" style={styles.bottomTabBar}>
             {TABS.map(tab => {
               const isActive = activeTab === tab.id;
               return (
@@ -246,13 +320,13 @@ function AppContent() {
                 </TouchableOpacity>
               );
             })}
-          </BlurView>
+          </GlassView>
         </View>
 
         {/* Olay (Event) Modal */}
         {state.currentEvent && (
           <View style={styles.modalOverlay}>
-            <BlurView intensity={80} tint="dark" style={styles.modalContent}>
+            <GlassView intensity={80} tint="dark" style={styles.modalContent}>
               <Text style={styles.modalTitle}>{state.currentEvent.title}</Text>
               <Text style={styles.modalText}>{state.currentEvent.text}</Text>
               <View style={styles.modalChoices}>
@@ -266,34 +340,57 @@ function AppContent() {
                   </TouchableOpacity>
                 ))}
               </View>
-            </BlurView>
+            </GlassView>
           </View>
         )}
 
         {/* Confirm Modal */}
-        {confirmDialog && !state.currentEvent && (
+        {state.confirmDialog && !state.currentEvent && (
           <View style={styles.modalOverlay}>
-            <BlurView intensity={80} tint="dark" style={styles.modalContent}>
-              <Text style={styles.modalTitle}>{confirmDialog.title}</Text>
-              <Text style={styles.modalText}>{confirmDialog.message}</Text>
+            <GlassView intensity={80} tint="dark" style={styles.modalContent}>
+              <Text style={styles.modalTitle}>{state.confirmDialog.title}</Text>
+              <Text style={styles.modalText}>{state.confirmDialog.message}</Text>
               <View style={{flexDirection: 'row', gap: 12}}>
                 <TouchableOpacity 
                   style={[styles.modalChoiceBtn, {flex: 1, backgroundColor: '#7f8c8d'}]} 
-                  onPress={confirmDialog.onCancel}
+                  onPress={state.confirmDialog.onCancel}
                 >
                   <Text style={styles.modalChoiceText}>İptal</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={[styles.modalChoiceBtn, {flex: 1, backgroundColor: '#2ecc71'}]} 
-                  onPress={confirmDialog.onConfirm}
+                  onPress={state.confirmDialog.onConfirm}
                 >
                   <Text style={styles.modalChoiceText}>Onayla</Text>
                 </TouchableOpacity>
               </View>
-            </BlurView>
+            </GlassView>
           </View>
         )}
       </SafeAreaView>
+
+      
+        {/* App Alert Modal */}
+        {state.appAlert && !state.currentEvent && (
+          <View style={styles.modalOverlay}>
+            <GlassView intensity={80} tint="dark" style={styles.modalContent}>
+              <Text style={styles.modalTitle}>{state.appAlert.title}</Text>
+              <Text style={styles.modalText}>{state.appAlert.message}</Text>
+              <TouchableOpacity 
+                style={[styles.modalChoiceBtn, {backgroundColor: '#3498db', alignItems: 'center'}]} 
+                onPress={() => dispatch({ type: 'HIDE_ALERT' })}
+              >
+                <Text style={styles.modalChoiceText}>Tamam</Text>
+              </TouchableOpacity>
+            </GlassView>
+          </View>
+        )}
+
+      {/* Eğitim Turu (Sadece 1 kez gösterilir) */}
+      <TutorialOverlay 
+        visible={!state.hasSeenTutorial && state.isCharacterCreated && !state.isGameOver && !showWelcome} 
+        onComplete={() => dispatch({ type: 'COMPLETE_TUTORIAL' })} 
+      />
     </ImageBackground>
   );
 }

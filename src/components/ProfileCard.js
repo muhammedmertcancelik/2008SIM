@@ -4,7 +4,7 @@
 
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { BlurView } from 'expo-blur';
+import GlassView from './GlassView';
 import { useGame } from '../state/GameContext';
 
 export default function ProfileCard() {
@@ -33,7 +33,7 @@ export default function ProfileCard() {
   }
 
   return (
-    <BlurView intensity={20} tint="light" style={styles.container}>
+    <GlassView intensity={20} tint="light" style={styles.container}>
       <TouchableOpacity 
         style={styles.headerRow} 
         onPress={() => setExpanded(!expanded)}
@@ -66,7 +66,7 @@ export default function ProfileCard() {
           ))}
         </View>
       )}
-    </BlurView>
+    </GlassView>
   );
 }
 

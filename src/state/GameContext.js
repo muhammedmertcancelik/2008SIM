@@ -2,7 +2,7 @@
 // OYUN DURUMU — React Context
 // ============================================
 
-import React, { createContext, useContext, useReducer, useCallback, useEffect, useState } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useEffect, useState, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRandomEvent } from '../data/events.js';
 import { EVENTS_2008 } from '../data/events_2008.js';
@@ -14,6 +14,8 @@ import { generateCharacterProfile } from '../data/characterModels.js';
 import { calculateGainedExp, checkLevelUp } from '../data/levels.js';
 import { EventEngine } from '../utils/EventEngine.js';
 import { AIStoryteller } from '../utils/AIStoryteller.js';
+import { NPCS, getInitialNpcRelationships, getInitialMetNpcs, checkNpcIntroCondition } from '../data/npcs.js';
+import { CHAPTERS, getCurrentChapterIndex, TOTAL_PAGES, FINAL_MONTH } from '../data/chapters.js';
 
 const STORAGE_KEY = 'life-sim-save';
 
@@ -97,6 +99,23 @@ const getInitialState = (customProfile = null) => {
     month: ECONOMY.startMonth,
     monthCount: 0,
 
+    // === YAŞAYAN ROMAN SİSTEMİ ===
+    bookPages: [],             // [{pageNum, content, chapter, monthCount, day}]
+    currentChapter: 0,         // 0-4 (5 bölüm index)
+    chaptersSeenIntro: [],     // Hangi bölüm intro'ları görüldü
+    pendingChapterIntro: null,  // Gösterilecek bölüm geçişi
+
+    // === NPC SİSTEMİ ===
+    npcRelationships: getInitialNpcRelationships(),
+    metNpcs: getInitialMetNpcs(),
+
+    // === GÜNLÜK EFOR SİSTEMİ ===
+    dailyActionCompleted: false,
+
+    // === BANKA MEVDUAT ===
+    bankSavings: 0,
+    // ==========================
+
     // Ürün fiyatları (kopyalar ve yıl kısıtlaması)
     currentProducts: PRODUCTS.filter(p => {
       if (p.minYear && ECONOMY.startYear < p.minYear) return false;
@@ -110,6 +129,11 @@ const getInitialState = (customProfile = null) => {
 
     // İstatistikler
     stats: { totalEarned: 0, totalSpent: 0, monthsPlayed: 0 },
+
+    // Onboarding
+    hasSeenTutorial: false,
+    appAlert: null,
+    confirmDialog: null,
 
     // UI durumu
     loaded: false,
@@ -174,6 +198,18 @@ function gameReducer(state, action) {
 
     case 'FINISH_GENERATING_EVENT':
       return { ...state, isGeneratingEvent: false, currentEvent: action.payload };
+
+    case 'SHOW_CONFIRM':
+      return { ...state, confirmDialog: action.payload };
+    case 'HIDE_CONFIRM':
+      return { ...state, confirmDialog: null };
+    case 'SHOW_ALERT':
+      return { ...state, appAlert: action.payload };
+    case 'HIDE_ALERT':
+      return { ...state, appAlert: null };
+
+    case 'COMPLETE_TUTORIAL':
+      return { ...state, hasSeenTutorial: true };
 
     case 'ACCEPT_QUEST': {
       const { quest } = action.payload;
@@ -246,6 +282,19 @@ function gameReducer(state, action) {
       };
     }
 
+    case 'DELIVERY_MINIGAME_RESULT': {
+      const { success, reward, energyCost } = action.payload;
+      
+      let baseState = {
+        ...state,
+        energy: Math.max(0, state.energy - energyCost),
+        hunger: Math.min(100, (state.hunger || 0) + 10),
+        stress: Math.min(100, state.stress + (success ? 2 : 10)),
+        dailyActionCompleted: true, // Efor harcandı
+      };
+      return updateQuestProgress(baseState, 'minigame_delivery', 1);
+    }
+
     case 'PAY_DEBT': {
       const { amount } = action.payload;
       return {
@@ -298,52 +347,25 @@ function gameReducer(state, action) {
       };
     }
 
-    case 'WORK': {
-      if (state.hasWorked || state.job === 'İşsiz' || !state.currentJobId) return state;
-      const currentEnergy = state.energy ?? 100;
-      const currentStress = state.stress ?? 0;
-      const currentHealth = state.health ?? 100;
+    case 'WORK_ACTION': {
+      if (state.energy < 20) return state;
       
-      const { JOBS } = require('../data/jobs');
-      const jobData = JOBS.find(j => j.id === state.currentJobId);
+      const wage = Math.round(state.salary / 30);
+      const newExp = (state.experience?.job || 0) + calculateGainedExp('job', state.hiddenStats?.levels?.job || 1);
       
-      const energyCost = jobData ? jobData.energyCost : 30;
-      const stressCost = jobData ? jobData.stressCost : 20;
-      const wantedInc = jobData && jobData.wantedIncrease ? jobData.wantedIncrease : 0;
-      
-      if (currentEnergy < energyCost) return state;
-
-      // İşten Kovulma Riski
-      if (currentStress > 90 || currentHealth < 30) {
-        if (Math.random() < 0.3) {
-          // %30 ihtimalle kovuldu
-          return {
-            ...state,
-            job: 'İşsiz',
-            salary: 0,
-            currentJobId: null,
-            stress: 100,
-            happiness: 0,
-            currentEvent: {
-              id: 'e_fired',
-              title: 'KOVULDUN!',
-              text: 'Aşırı stresli ve bitkin halin yüzünden patronla tartıştın. Eşyalarını topla, artık işsizsin.',
-              choices: [{ text: 'Kahretsin!', effects: { happiness: -20, reputation: -20 } }]
-            }
-          };
+      let baseState = {
+        ...state,
+        money: state.money + wage,
+        energy: Math.max(0, state.energy - 20),
+        stress: Math.min(100, state.stress + 5),
+        hunger: Math.min(100, (state.hunger || 0) + 15),
+        hasWorked: true,
+        dailyActionCompleted: true, // Efor harcandı
+        experience: { ...state.experience, job: newExp },
+        stats: {
+          ...state.stats,
+          totalEarned: (state.stats?.totalEarned || 0) + wage
         }
-      }
-
-      let newEnergy = Math.max(0, currentEnergy - energyCost);
-      let newStress = Math.min(100, currentStress + stressCost);
-      let newWantedLevel = Math.min(100, (state.wantedLevel || 0) + wantedInc);
-
-      const baseState = { 
-        ...state, 
-        hasWorked: true, 
-        energy: newEnergy, 
-        stress: newStress,
-        wantedLevel: newWantedLevel
       };
       return updateQuestProgress(baseState, 'work', 1);
     }
@@ -530,6 +552,7 @@ function gameReducer(state, action) {
         money: state.money + (rewardMoney || 0),
         reputation: (state.reputation || 50) + (rewardReputation || 0),
         wantedLevel: Math.max(0, (state.wantedLevel || 0) + (rewardWantedLevel || 0)),
+        dailyActionCompleted: true // Efor harcandı
       };
       return updateQuestProgress(baseState, 'minigame_delivery', 1);
     }
@@ -615,7 +638,7 @@ function gameReducer(state, action) {
         }
       }
 
-      let newState = { ...state, health: currentHealth, hunger: currentHunger, currentEvent: nextEvent, delayedEvents: currentDelayedEvents, isGameOver, gameOverReason };
+      let newState = { ...state, health: currentHealth, hunger: currentHunger, currentEvent: nextEvent, delayedEvents: currentDelayedEvents, isGameOver, gameOverReason, dailyActionCompleted: false };
       
       if (newDay <= 30) {
         // Ay bitmedi
@@ -703,18 +726,64 @@ function gameReducer(state, action) {
         newBankDebt = Math.round(newBankDebt * 1.08);
       }
 
+      // === VADELİ MEVDUAT FAİZİ (Aylık %4) ===
+      let newBankSavings = state.bankSavings || 0;
+      if (newBankSavings > 0) {
+        newBankSavings = Math.round(newBankSavings * 1.04);
+      }
+
+      // === BÖLÜM GEÇİŞ KONTROLÜ ===
+      const newMonthCount = state.monthCount + 1;
+      const newChapterIdx = getCurrentChapterIndex(newMonthCount);
+      const oldChapterIdx = state.currentChapter || 0;
+      let pendingChapterIntro = state.pendingChapterIntro;
+      let newChaptersSeenIntro = [...(state.chaptersSeenIntro || [])];
+
+      if (newChapterIdx > oldChapterIdx && !newChaptersSeenIntro.includes(newChapterIdx)) {
+        pendingChapterIntro = newChapterIdx;
+      }
+
+      // === NPC TANIŞMA KONTROLÜ ===
+      let newMetNpcs = [...(state.metNpcs || [])];
+      let newNpcRelationships = { ...(state.npcRelationships || {}) };
+      const tempState = { ...state, monthCount: newMonthCount };
+      NPCS.forEach(npc => {
+        if (!newMetNpcs.includes(npc.id) && npc.introChapter <= newChapterIdx) {
+          if (checkNpcIntroCondition(npc, tempState)) {
+            newMetNpcs.push(npc.id);
+            newNpcRelationships[npc.id] = 40;
+          }
+        }
+      });
+
+      // === KİTAP SONU KONTROLÜ ===
+      let bookComplete = false;
+      if (newMonthCount > FINAL_MONTH && !isGameOver) {
+        isGameOver = true;
+        gameOverReason = 'BOOK_COMPLETE';
+        bookComplete = true;
+      }
+
       return {
         ...newState,
-        day: newDay - 30, // Artan günleri sonraki aya sarkıt
+        day: newDay - 30,
         month: newMonth,
         year: newYear,
-        monthCount: state.monthCount + 1,
+        monthCount: newMonthCount,
         salary: newSalary,
         money: state.money + earnedSalary - monthlyBills - unmetPenalty,
         bankDebt: newBankDebt,
+        bankSavings: newBankSavings,
         hasWorked: false,
         reputation: newReputation,
         inventory: newInventory,
+        currentChapter: newChapterIdx,
+        pendingChapterIntro,
+        chaptersSeenIntro: newChaptersSeenIntro,
+        metNpcs: newMetNpcs,
+        npcRelationships: newNpcRelationships,
+        isGameOver,
+        gameOverReason,
         needs: {
           food: { current: 0, target: state.needs.food.target },
           transport: { current: 0, target: (state.inventory || []).includes('a_car_sahin') ? 0 : state.needs.transport.target },
@@ -730,6 +799,97 @@ function gameReducer(state, action) {
       };
     }
 
+    // === YAŞAYAN ROMAN REDUCER'LARI ===
+    case 'ADD_BOOK_PAGE': {
+      const { content, chapter } = action.payload;
+      const pageNum = (state.bookPages?.length || 0) + 1;
+      const newPage = {
+        pageNum,
+        content,
+        chapter,
+        monthCount: state.monthCount,
+        day: state.day,
+        year: state.year,
+        month: state.month
+      };
+      return {
+        ...state,
+        bookPages: [...(state.bookPages || []), newPage]
+      };
+    }
+
+    case 'MARK_CHAPTER_SEEN': {
+      const chapterIdx = action.payload;
+      return {
+        ...state,
+        chaptersSeenIntro: [...(state.chaptersSeenIntro || []), chapterIdx],
+        pendingChapterIntro: null
+      };
+    }
+
+    case 'MEET_NPC': {
+      const npcId = action.payload;
+      if ((state.metNpcs || []).includes(npcId)) return state;
+      return {
+        ...state,
+        metNpcs: [...(state.metNpcs || []), npcId],
+        npcRelationships: {
+          ...state.npcRelationships,
+          [npcId]: 40 // İlk tanışmada 40'dan başlar
+        }
+      };
+    }
+
+    case 'UPDATE_NPC_RELATIONSHIP': {
+      const { npcId, change } = action.payload;
+      const currentRel = state.npcRelationships?.[npcId] || 0;
+      return {
+        ...state,
+        npcRelationships: {
+          ...state.npcRelationships,
+          [npcId]: Math.max(0, Math.min(100, currentRel + change))
+        }
+      };
+    }
+
+    case 'INTERACT_NPC': {
+      const { npcId } = action.payload;
+      const energyCost = 15;
+      
+      if (state.energy < energyCost || state.dailyActionCompleted) return state;
+
+      const currentRel = state.npcRelationships?.[npcId] || 0;
+      return {
+        ...state,
+        energy: state.energy - energyCost,
+        dailyActionCompleted: true, // Efor harcandı
+        npcRelationships: {
+          ...state.npcRelationships,
+          [npcId]: Math.max(0, Math.min(100, currentRel + 2))
+        }
+      };
+    }
+
+    case 'DEPOSIT_MONEY': {
+      const amount = action.payload;
+      if (amount > state.money) return state;
+      return {
+        ...state,
+        money: state.money - amount,
+        bankSavings: (state.bankSavings || 0) + amount
+      };
+    }
+
+    case 'WITHDRAW_MONEY': {
+      const amount = action.payload;
+      if (amount > (state.bankSavings || 0)) return state;
+      return {
+        ...state,
+        money: state.money + amount,
+        bankSavings: (state.bankSavings || 0) - amount
+      };
+    }
+
     case 'NEW_GAME': {
       const customProfileData = action.payload; // { storyId, name, gender, country }
       let newCharData = null;
@@ -741,7 +901,7 @@ function gameReducer(state, action) {
           customProfileData.country
         );
       }
-      return { ...getInitialState(newCharData), loaded: true };
+      return { ...getInitialState(newCharData), hasSeenTutorial: state.hasSeenTutorial, loaded: true };
     }
 
     default:
@@ -757,6 +917,34 @@ export function GameProvider({ children }) {
   const [cachedAiEvent, setCachedAiEvent] = useState(null);
   const [cachedRunId, setCachedRunId] = useState(null);
   const [isFetchingAi, setIsFetchingAi] = useState(false);
+  const [isGeneratingPage, setIsGeneratingPage] = useState(false);
+  const prevDayRef = useRef(null);
+
+  // Arka planda Kitap Sayfası (Günlük Paragraf) Oluşturma
+  useEffect(() => {
+    if (!state?.loaded || !state.isCharacterCreated || state.isGameOver) return;
+    
+    // Eğer gün değiştiyse yeni sayfa yazdır
+    if (prevDayRef.current !== null && prevDayRef.current !== state.day && !isGeneratingPage) {
+      const pageNeedsGen = state.bookPages?.length < (state.monthCount * 30 + state.day);
+      if (pageNeedsGen) {
+        setIsGeneratingPage(true);
+        // O gün yaşanan bir olay varsa bul (şu an basitçe null geçiyoruz, event geldiğinde bookPage'e eklenebilir)
+        const dailyEvent = state.lastEvent?.day === state.day ? state.lastEvent : null;
+        
+        AIStoryteller.generateBookPage(state, dailyEvent).then(content => {
+          if (content) {
+            dispatch({ type: 'ADD_BOOK_PAGE', payload: { content, chapter: state.currentChapter } });
+          }
+          setIsGeneratingPage(false);
+        }).catch(err => {
+          console.log('Book page gen error:', err);
+          setIsGeneratingPage(false);
+        });
+      }
+    }
+    prevDayRef.current = state.day;
+  }, [state?.day, state?.loaded, state?.isCharacterCreated, state?.isGameOver]);
 
   // Arka planda AI Senaryosu Hazırlama (Prefetching)
   useEffect(() => {
@@ -828,6 +1016,14 @@ export function GameProvider({ children }) {
         })),
         transactions: gameState.transactions.slice(-50),
         stats: gameState.stats,
+        // === Yaşayan Roman ===
+        bookPages: gameState.bookPages || [],
+        currentChapter: gameState.currentChapter || 0,
+        chaptersSeenIntro: gameState.chaptersSeenIntro || [],
+        pendingChapterIntro: gameState.pendingChapterIntro,
+        npcRelationships: gameState.npcRelationships || {},
+        metNpcs: gameState.metNpcs || [],
+        bankSavings: gameState.bankSavings || 0,
       };
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
     } catch (e) {

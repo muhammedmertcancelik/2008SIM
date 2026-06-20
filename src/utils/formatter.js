@@ -9,8 +9,10 @@ export const formatMoney = (amount) => {
   });
 };
 
-export const formatMoneyFull = (amount) => {
-  return `${formatMoney(amount)} TL`;
+export const getCurrency = (language) => language === 'en' ? '$' : 'TL';
+
+export const formatMoneyFull = (amount, language = 'tr') => {
+  return `${formatMoney(amount)} ${getCurrency(language)}`;
 };
 
 export const formatPercent = (value) => {

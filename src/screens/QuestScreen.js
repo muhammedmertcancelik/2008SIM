@@ -2,10 +2,12 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useGame } from '../state/GameContext';
 import { QUESTS_DATA } from '../data/quests';
-import { formatMoney } from '../utils/formatter';
+import { getTranslation } from '../i18n';
+import {  formatMoney , getCurrency } from '../utils/formatter';
 
 export default function QuestScreen() {
   const { state, dispatch } = useGame();
+  const t = getTranslation(state?.language || 'tr');
 
   const handleAcceptQuest = (quest) => {
     dispatch({ type: 'ACCEPT_QUEST', payload: { quest } });
@@ -13,10 +15,10 @@ export default function QuestScreen() {
 
   const getRewardText = (rewards) => {
     let parts = [];
-    if (rewards.money) parts.push(`+${formatMoney(rewards.money)} TL`);
-    if (rewards.reputation) parts.push(`+${rewards.reputation} İtibar`);
-    if (rewards.wantedLevelChange) parts.push(`${rewards.wantedLevelChange} Aranma`);
-    if (rewards.item) parts.push(`Eşya: ${rewards.item.name}`);
+    if (rewards.money) parts.push(`+${formatMoney(rewards.money)} ${getCurrency(state?.language)}`);
+    if (rewards.reputation) parts.push(`+${rewards.reputation} ${t('quests.reputation')}`);
+    if (rewards.wantedLevelChange) parts.push(`${rewards.wantedLevelChange} ${t('quests.wanted')}`);
+    if (rewards.item) parts.push(`${t('quests.item')}: ${state.language === 'en' ? (rewards.item.name_en || rewards.item.name) : rewards.item.name}`);
     return parts.join(' | ');
   };
 
@@ -34,25 +36,25 @@ export default function QuestScreen() {
       {/* Aktif Görevler */}
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionIcon}>🔥</Text>
-        <Text style={styles.sectionTitle}>Aktif Görevler</Text>
+        <Text style={styles.sectionTitle}>{t('quests.activeQuests')}</Text>
       </View>
       
       {activeQuests.length === 0 ? (
-        <Text style={styles.emptyText}>Şu an aktif bir göreviniz bulunmuyor.</Text>
+        <Text style={styles.emptyText}>{t('quests.noActiveQuests')}</Text>
       ) : (
         activeQuests.map(quest => {
           const percent = Math.min(100, Math.round(((quest.currentAmount || 0) / quest.targetAmount) * 100));
           return (
             <View key={quest.id} style={styles.activeCard}>
               <View style={styles.cardHeader}>
-                <Text style={styles.questTitle}>{quest.title}</Text>
+                <Text style={styles.questTitle}>{state.language === 'en' ? (quest.title_en || quest.title) : quest.title}</Text>
                 <Text style={styles.questTypeBadge}>{quest.type.toUpperCase()}</Text>
               </View>
-              <Text style={styles.questDesc}>{quest.description}</Text>
+              <Text style={styles.questDesc}>{state.language === 'en' ? (quest.description_en || quest.description) : quest.description}</Text>
               
               <View style={styles.progressContainer}>
                 <View style={styles.progressLabelRow}>
-                  <Text style={styles.progressLabel}>İlerleme: {quest.currentAmount || 0} / {quest.targetAmount}</Text>
+                  <Text style={styles.progressLabel}>{t('quests.progress')}: {quest.currentAmount || 0} / {quest.targetAmount}</Text>
                   <Text style={styles.progressPercent}>%{percent}</Text>
                 </View>
                 <View style={styles.progressBg}>
@@ -61,7 +63,7 @@ export default function QuestScreen() {
               </View>
 
               <View style={styles.rewardBox}>
-                <Text style={styles.rewardTitle}>Ödül:</Text>
+                <Text style={styles.rewardTitle}>{t('quests.reward')}:</Text>
                 <Text style={styles.rewardText}>{getRewardText(quest.rewards)}</Text>
               </View>
             </View>
@@ -72,22 +74,22 @@ export default function QuestScreen() {
       {/* Alınabilir Görevler */}
       <View style={[styles.sectionHeader, { marginTop: 20 }]}>
         <Text style={styles.sectionIcon}>📋</Text>
-        <Text style={styles.sectionTitle}>Müsait Görevler</Text>
+        <Text style={styles.sectionTitle}>{t('quests.availableQuests')}</Text>
       </View>
 
       {availableQuests.length === 0 ? (
-        <Text style={styles.emptyText}>Şu an alınabilecek yeni bir görev yok.</Text>
+        <Text style={styles.emptyText}>{t('quests.noAvailableQuests')}</Text>
       ) : (
         availableQuests.map(quest => (
           <View key={quest.id} style={styles.availableCard}>
             <View style={styles.cardHeader}>
-              <Text style={styles.questTitle}>{quest.title}</Text>
+              <Text style={styles.questTitle}>{state.language === 'en' ? (quest.title_en || quest.title) : quest.title}</Text>
               <Text style={styles.questTypeBadge}>{quest.type.toUpperCase()}</Text>
             </View>
-            <Text style={styles.questDesc}>{quest.description}</Text>
+            <Text style={styles.questDesc}>{state.language === 'en' ? (quest.description_en || quest.description) : quest.description}</Text>
             
             <View style={styles.rewardBox}>
-              <Text style={styles.rewardTitle}>Ödül:</Text>
+              <Text style={styles.rewardTitle}>{t('quests.reward')}:</Text>
               <Text style={styles.rewardText}>{getRewardText(quest.rewards)}</Text>
             </View>
 
@@ -96,7 +98,7 @@ export default function QuestScreen() {
               onPress={() => handleAcceptQuest(quest)}
               activeOpacity={0.7}
             >
-              <Text style={styles.acceptBtnText}>Görevi Al</Text>
+              <Text style={styles.acceptBtnText}>{t('quests.acceptQuest')}</Text>
             </TouchableOpacity>
           </View>
         ))
@@ -112,8 +114,8 @@ export default function QuestScreen() {
       
       {completedQuests.map(quest => (
         <View key={quest.id} style={styles.completedCard}>
-          <Text style={styles.questTitle}>{quest.title}</Text>
-          <Text style={styles.questDesc}>{quest.description}</Text>
+          <Text style={styles.questTitle}>{state.language === 'en' ? (quest.title_en || quest.title) : quest.title}</Text>
+          <Text style={styles.questDesc}>{state.language === 'en' ? (quest.description_en || quest.description) : quest.description}</Text>
           <Text style={styles.completedBadge}>TAMAMLANDI</Text>
         </View>
       ))}
@@ -148,7 +150,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   activeCard: {
-    backgroundColor: 'rgba(26, 188, 156, 0.15)',
+    backgroundColor: 'rgba(26, 188, 156, 0.85)',
     borderWidth: 1,
     borderColor: 'rgba(26, 188, 156, 0.4)',
     borderRadius: 16,
@@ -164,7 +166,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   completedCard: {
-    backgroundColor: 'rgba(46, 204, 113, 0.05)',
+    backgroundColor: 'rgba(46, 204, 113, 0.85)',
     borderWidth: 1,
     borderColor: 'rgba(46, 204, 113, 0.2)',
     borderRadius: 16,
@@ -188,7 +190,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     color: '#1abc9c',
-    backgroundColor: 'rgba(26, 188, 156, 0.2)',
+    backgroundColor: 'rgba(26, 188, 156, 0.85)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -220,7 +222,7 @@ const styles = StyleSheet.create({
   },
   progressBg: {
     height: 8,
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     borderRadius: 4,
   },
   progressFill: {
@@ -231,7 +233,7 @@ const styles = StyleSheet.create({
   rewardBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.2)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     padding: 8,
     borderRadius: 8,
     gap: 8,

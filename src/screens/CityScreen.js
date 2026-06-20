@@ -1,30 +1,33 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Platform } from 'react-native';
+import GlassView from '../components/GlassView';
 import { useGame } from '../state/GameContext';
+import { getTranslation } from '../i18n';
 import ReflexMinigame from '../components/ReflexMinigame';
 import HackingMinigame from '../components/HackingMinigame';
 import DeliveryMinigame from '../components/DeliveryMinigame';
 
 export default function CityScreen() {
   const { state, dispatch } = useGame();
+  const t = getTranslation(state?.language || 'tr');
   const [diceResult, setDiceResult] = useState(null);
   const [playingDelivery, setPlayingDelivery] = useState(false);
 
   const handleVisit = (name, locationData) => {
     if (state.energy < locationData.energyCost) {
       if (Platform.OS !== 'web') {
-        Alert.alert('Yetersiz Enerji', `${name} için en az ${locationData.energyCost} enerjin olmalı.`);
+        dispatch({ type: 'SHOW_ALERT', payload: { title: t('city.alerts.noEnergy'), message: t('city.alerts.noEnergyDesc').replace('{name}', name).replace('{cost}', locationData.energyCost) } });
       } else {
-        alert(`Yetersiz Enerji: ${name} için en az ${locationData.energyCost} enerjin olmalı.`);
+        alert(`${t('city.alerts.noEnergy')}: ${t('city.alerts.noEnergyDesc').replace('{name}', name).replace('{cost}', locationData.energyCost)}`);
       }
       return;
     }
 
     if (state.money < locationData.cost) {
       if (Platform.OS !== 'web') {
-        Alert.alert('Yetersiz Para', `${name} için en az ${locationData.cost} TL paran olmalı.`);
+        dispatch({ type: 'SHOW_ALERT', payload: { title: t('city.alerts.noMoney'), message: t('city.alerts.noMoneyDesc').replace('{name}', name).replace('{cost}', locationData.cost) } });
       } else {
-        alert(`Yetersiz Para: ${name} için en az ${locationData.cost} TL paran olmalı.`);
+        alert(`${t('city.alerts.noMoney')}: ${t('city.alerts.noMoneyDesc').replace('{name}', name).replace('{cost}', locationData.cost)}`);
       }
       return;
     }
@@ -32,7 +35,7 @@ export default function CityScreen() {
     dispatch({ type: 'VISIT_LOCATION', payload: locationData });
     
     if (Platform.OS !== 'web') {
-      Alert.alert('Mekan Ziyareti', `${name} ziyaret edildi. Enerji: -${locationData.energyCost}, Para: -${locationData.cost} TL`);
+      dispatch({ type: 'SHOW_ALERT', payload: { title: t('city.alerts.visitTitle'), message: t('city.alerts.visitDesc').replace('{name}', name).replace('{energy}', locationData.energyCost).replace('{money}', locationData.cost) } });
     }
   };
 
@@ -72,9 +75,9 @@ export default function CityScreen() {
       payload: { rewardMoney: reward, rewardReputation: 2, rewardWantedLevel: -2 } 
     });
     if (Platform.OS !== 'web') {
-      Alert.alert('Teslimat Bitti!', `Başarıyla teslimat yaptın ve yolda ${coins} altın topladın. Ödül: ${reward} TL`);
+      dispatch({ type: 'SHOW_ALERT', payload: { title: t('city.alerts.deliveryDone'), message: t('city.alerts.deliveryDoneDesc').replace('{coins}', coins).replace('{reward}', reward) } });
     } else {
-      alert(`Teslimat Bitti! Yolda ${coins} altın topladın. Ödül: ${reward} TL`);
+      alert(`${t('city.alerts.deliveryDone')} ${t('city.alerts.deliveryDoneDesc').replace('{coins}', coins).replace('{reward}', reward)}`);
     }
   };
 
@@ -85,9 +88,9 @@ export default function CityScreen() {
       payload: { cost: 30, energyCost: 20, moneyChange: 0, stress: 30, health: -15 } 
     });
     if (Platform.OS !== 'web') {
-      Alert.alert('Kaza!', 'Kaza yaptın! Hastane ve motor masrafı: -30 TL, Sağlık azaldı.');
+      dispatch({ type: 'SHOW_ALERT', payload: { title: t('city.alerts.accident'), message: t('city.alerts.accidentDesc') } });
     } else {
-      alert('Kaza! Kaza yaptın! Hastane ve motor masrafı: -30 TL, Sağlık azaldı.');
+      alert(`${t('city.alerts.accident')} ${t('city.alerts.accidentDesc')}`);
     }
   };
 
@@ -97,90 +100,90 @@ export default function CityScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Şehir Rehberi</Text>
-      <Text style={styles.subtitle}>Gün geçirmeden aktif olarak enerji harcayabileceğin mekanlar.</Text>
+      <Text style={styles.title}>{t('city.title')}</Text>
+      <Text style={styles.subtitle}>{t('city.subtitle')}</Text>
 
       {/* Sokak Büfesi */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>🍔 Sokak Büfesi</Text>
-        <Text style={styles.cardDesc}>Tükettiğin enerjiyi ve artan açlığını bastırmak için ayaküstü bir şeyler atıştır.</Text>
-        <Text style={styles.cardStats}>Gereksinim: 20 TL</Text>
-        <Text style={styles.cardEffect}>Etki: Açlık -50, Enerji +10</Text>
+      <GlassView intensity={40} tint="dark" style={styles.card}>
+        <Text style={styles.cardTitle}>{t('city.streetFood.title')}</Text>
+        <Text style={styles.cardDesc}>{t('city.streetFood.desc')}</Text>
+        <Text style={styles.cardStats}>{t('city.streetFood.req')}</Text>
+        <Text style={styles.cardEffect}>{t('city.streetFood.effect')}</Text>
         <TouchableOpacity 
-          style={[styles.btn, {backgroundColor: '#f39c12'}]} 
-          onPress={() => handleVisit('Sokak Büfesi', { cost: 20, energyCost: 0, hunger: -50, health: 5, energy: 10 })}
+          style={styles.btn} 
+          onPress={() => handleVisit(t('city.streetFood.name'), { cost: 20, energyCost: 0, hunger: -50, health: 5, energy: 10 })}
         >
-          <Text style={styles.btnText}>Yemek Ye (20 TL)</Text>
+          <Text style={styles.btnText}>{t('city.streetFood.btn')}</Text>
         </TouchableOpacity>
-      </View>
+      </GlassView>
 
       {/* Kurye Merkezi */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>🛵 Kurye Merkezi</Text>
-        <Text style={styles.cardDesc}>Trafikte tehlikeli kuryelik yaparak yeteneklerini test et.</Text>
-        <Text style={styles.cardStats}>Gereksinim: Tehlikeli Teslimat Görevi</Text>
-        <Text style={styles.cardEffect}>Ödül: 800 TL, +20 İtibar</Text>
+      <GlassView intensity={40} tint="dark" style={styles.card}>
+        <Text style={styles.cardTitle}>{t('city.delivery.title')}</Text>
+        <Text style={styles.cardDesc}>{t('city.delivery.desc')}</Text>
+        <Text style={styles.cardStats}>{t('city.delivery.req')}</Text>
+        <Text style={styles.cardEffect}>{t('city.delivery.effect')}</Text>
         <TouchableOpacity 
-          style={[styles.btn, {backgroundColor: '#e67e22'}]} 
+          style={styles.btn} 
           onPress={() => setPlayingDelivery(true)}
         >
-          <Text style={styles.btnText}>Teslimata Başla</Text>
+          <Text style={styles.btnText}>{t('city.delivery.btn')}</Text>
         </TouchableOpacity>
-      </View>
+      </GlassView>
 
       {/* Spor Salonu */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>🏋️‍♂️ Spor Salonu</Text>
-        <Text style={styles.cardDesc}>Sağlığını korumak ve fit kalmak için ter dök.</Text>
-        <Text style={styles.cardStats}>Gereksinim: 40 Enerji, 30 TL</Text>
-        <Text style={styles.cardEffect}>Etki: Sağlık +10</Text>
+      <GlassView intensity={40} tint="dark" style={styles.card}>
+        <Text style={styles.cardTitle}>{t('city.gym.title')}</Text>
+        <Text style={styles.cardDesc}>{t('city.gym.desc')}</Text>
+        <Text style={styles.cardStats}>{t('city.gym.req')}</Text>
+        <Text style={styles.cardEffect}>{t('city.gym.effect')}</Text>
         <TouchableOpacity 
-          style={[styles.btn, styles.gymBtn]} 
-          onPress={() => handleVisit('Spor Salonu', { cost: 30, energyCost: 40, health: 10 })}
+          style={styles.btn} 
+          onPress={() => handleVisit(t('city.gym.name'), { cost: 30, energyCost: 40, health: 10 })}
         >
-          <Text style={styles.btnText}>Antrenman Yap</Text>
+          <Text style={styles.btnText}>{t('city.gym.btn')}</Text>
         </TouchableOpacity>
-      </View>
+      </GlassView>
 
       {/* Bar */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>🍻 Köhne Bar</Text>
-        <Text style={styles.cardDesc}>İş stresini atmak için bir iki kadeh bir şeyler iç.</Text>
-        <Text style={styles.cardStats}>Gereksinim: 20 Enerji, 50 TL</Text>
-        <Text style={styles.cardEffect}>Etki: Stres -30, Mutluluk +10, Sağlık -5</Text>
+      <GlassView intensity={40} tint="dark" style={styles.card}>
+        <Text style={styles.cardTitle}>{t('city.bar.title')}</Text>
+        <Text style={styles.cardDesc}>{t('city.bar.desc')}</Text>
+        <Text style={styles.cardStats}>{t('city.bar.req')}</Text>
+        <Text style={styles.cardEffect}>{t('city.bar.effect')}</Text>
         <TouchableOpacity 
-          style={[styles.btn, styles.barBtn]} 
-          onPress={() => handleVisit('Köhne Bar', { cost: 50, energyCost: 20, stress: -30, happiness: 10, health: -5 })}
+          style={styles.btn} 
+          onPress={() => handleVisit(t('city.bar.name'), { cost: 50, energyCost: 20, stress: -30, happiness: 10, health: -5 })}
         >
-          <Text style={styles.btnText}>Bara Gir</Text>
+          <Text style={styles.btnText}>{t('city.bar.btn')}</Text>
         </TouchableOpacity>
-      </View>
+      </GlassView>
 
       {/* Kumarhane */}
-      <View style={[styles.card, styles.casinoCard]}>
-        <Text style={styles.cardTitle}>🎲 Yeraltı Kumarhanesi</Text>
-        <Text style={styles.cardDesc}>Dikkat ve refleks testi! Çizgi yeşil alandayken ŞİMDİ DURDUR tuşuna basarak bahsini ikiye katla. Zamanlaman kötüyse paranı kaybedersin.</Text>
-        <Text style={styles.cardStats}>Bahis: 100 TL | Gereksinim: 10 Enerji</Text>
+      <GlassView intensity={40} tint="dark" style={[styles.card, styles.casinoCard]}>
+        <Text style={styles.cardTitle}>{t('city.casino.title')}</Text>
+        <Text style={styles.cardDesc}>{t('city.casino.desc')}</Text>
+        <Text style={styles.cardStats}>{t('city.casino.req')}</Text>
         
         <ReflexMinigame 
           betAmount={100}
           onWin={handleWin}
           onLose={handleLose}
         />
-      </View>
+      </GlassView>
 
       {/* İnternet Kafe - Karanlık Ağ */}
-      <View style={[styles.card, styles.hackCard]}>
-        <Text style={styles.cardTitle}>💻 İnternet Kafe (Karanlık Ağ)</Text>
-        <Text style={styles.cardDesc}>Bir banka sistemine sızmaya çalış. 3 round'da hedef kodları yakala. Başarırsan büyük para, başarısamazsan polis peşinde!</Text>
-        <Text style={styles.cardStats}>Gereksinim: 30 Enerji | Kazanc: +2000 TL</Text>
-        <Text style={[styles.cardEffect, {color: '#e74c3c'}]}>Risk: Aranma Seviyesi +15 (Başarı) / +30 (Başarısız)</Text>
+      <GlassView intensity={40} tint="dark" style={[styles.card, styles.hackCard]}>
+        <Text style={styles.cardTitle}>{t('city.hack.title')}</Text>
+        <Text style={styles.cardDesc}>{t('city.hack.desc')}</Text>
+        <Text style={styles.cardStats}>{t('city.hack.req')}</Text>
+        <Text style={[styles.cardEffect, {color: '#e74c3c'}]}>{t('city.hack.effect')}</Text>
         
         <HackingMinigame 
           onSuccess={handleHackSuccess}
           onFail={handleHackFail}
         />
-      </View>
+      </GlassView>
 
       <View style={{ height: 100 }} />
     </ScrollView>
@@ -203,21 +206,18 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   card: {
-    backgroundColor: 'rgba(142, 68, 173, 0.1)',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
+    padding: 16,
+    borderRadius: 20,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(142, 68, 173, 0.25)'
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    overflow: 'hidden',
   },
   casinoCard: {
-    borderColor: '#8e44ad',
-    borderWidth: 2,
+    borderColor: 'rgba(142, 68, 173, 0.4)',
   },
   hackCard: {
-    borderColor: '#16a085',
-    borderWidth: 2,
-    backgroundColor: '#1a2a2a',
+    borderColor: 'rgba(22, 160, 133, 0.4)',
   },
   cardTitle: {
     fontSize: 18,
@@ -243,18 +243,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   btn: {
-    padding: 12,
-    borderRadius: 6,
+    paddingVertical: 14,
+    borderRadius: 16,
     alignItems: 'center',
-  },
-  gymBtn: {
-    backgroundColor: '#27ae60',
-  },
-  barBtn: {
-    backgroundColor: '#d35400',
-  },
-  casinoBtn: {
-    backgroundColor: '#8e44ad',
+    backgroundColor: 'rgba(255, 205, 163, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 205, 163, 0.3)',
+    marginTop: 10,
   },
   btnText: {
     color: '#fff',
@@ -262,7 +257,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   resultBox: {
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
     padding: 10,
     borderRadius: 5,
     marginBottom: 10,

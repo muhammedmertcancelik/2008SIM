@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing, Dimensions } from 'react-native';
-import { BlurView } from 'expo-blur';
+import GlassView from './GlassView';
 import { useGame } from '../state/GameContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -143,7 +143,7 @@ export default function DeliveryMinigame({ onComplete, onFail }) {
 
   if (!isPlaying && !gameOver) {
     return (
-      <BlurView intensity={30} tint="dark" style={styles.container}>
+      <GlassView intensity={30} tint="dark" style={styles.container}>
         <Text style={styles.title}>🏍️ Kurye Macerası</Text>
         <Text style={styles.desc}>20 Paketi sağ salim teslim et!</Text>
         <Text style={styles.desc}>Yoldaki Altınları (💰) toplayarak bahşişini artır. Arabalara ve çukurlara dikkat et!</Text>
@@ -153,13 +153,13 @@ export default function DeliveryMinigame({ onComplete, onFail }) {
         <TouchableOpacity style={styles.cancelBtn} onPress={onFail}>
           <Text style={styles.cancelBtnText}>Vazgeç</Text>
         </TouchableOpacity>
-      </BlurView>
+      </GlassView>
     );
   }
 
   if (gameOver) {
     return (
-      <BlurView intensity={40} tint="dark" style={styles.container}>
+      <GlassView intensity={40} tint="dark" style={styles.container}>
         <Text style={styles.title}>💥 KAZA YAPTIN!</Text>
         <Text style={styles.desc}>Kalan Teslimat: {20 - score}</Text>
         <Text style={styles.desc}>Toplanan Bahşiş: {coins} 💰</Text>
@@ -167,12 +167,12 @@ export default function DeliveryMinigame({ onComplete, onFail }) {
         <TouchableOpacity style={styles.cancelBtn} onPress={onFail}>
           <Text style={styles.cancelBtnText}>Kabul Et ve Çık (-30 TL, Sağlık Düşüşü)</Text>
         </TouchableOpacity>
-      </BlurView>
+      </GlassView>
     );
   }
 
   return (
-    <BlurView intensity={20} tint="dark" style={styles.gameArea}>
+    <GlassView intensity={20} tint="dark" style={styles.gameArea}>
       <View style={styles.header}>
         <Text style={styles.scoreText}>Paket: {score}/20</Text>
         <Text style={styles.coinText}>Bahşiş: {coins} 💰</Text>
@@ -216,7 +216,7 @@ export default function DeliveryMinigame({ onComplete, onFail }) {
           <Text style={styles.controlBtnText}>SAĞ ▶</Text>
         </TouchableOpacity>
       </View>
-    </BlurView>
+    </GlassView>
   );
 }
 

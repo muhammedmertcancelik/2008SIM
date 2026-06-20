@@ -5,7 +5,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useGame } from '../state/GameContext';
-import { formatMoney } from '../utils/formatter';
+import {  formatMoney , getCurrency } from '../utils/formatter';
 
 export default function NeedsTracker() {
   const { state } = useGame();
@@ -34,7 +34,7 @@ export default function NeedsTracker() {
             <View style={styles.needHeader}>
               <Text style={styles.needLabel}>{need.label}</Text>
               <Text style={[styles.needValue, { color: barColor }]}>
-                {formatMoney(need.current)} / {formatMoney(need.target)} TL
+                {formatMoney(need.current)} / {formatMoney(need.target)} {getCurrency(state?.language)}
               </Text>
             </View>
             <View style={styles.progressBg}>

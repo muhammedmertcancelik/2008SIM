@@ -1,107 +1,159 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import GlassView from '../components/GlassView';
 import { useGame } from '../state/GameContext';
-import { formatMoneyFull } from '../utils/formatter';
+import { getTranslation } from '../i18n';
+import {  formatMoneyFull , getCurrency } from '../utils/formatter';
 
 export default function BankScreen() {
   const { state, dispatch } = useGame();
+  const t = getTranslation(state?.language || 'tr');
   
   const handleTakeLoan = (amount) => {
     if (state.creditScore < 800) {
-      Alert.alert('Kredi Reddedildi', 'Kredi notunuz çok düşük. Banka size kredi vermiyor.');
+      dispatch({ type: 'SHOW_ALERT', payload: { title: t('bank.alerts.loanRejected'), message: t('bank.alerts.loanRejectedDesc') } });
       return;
     }
     dispatch({ type: 'TAKE_LOAN', payload: { amount } });
-    Alert.alert('Kredi Onaylandı', `${formatMoneyFull(amount)} hesabınıza yattı.`);
+    dispatch({ type: 'SHOW_ALERT', payload: { title: t('bank.alerts.loanApproved'), message: t('bank.alerts.loanApprovedDesc').replace('{amount}', formatMoneyFull(amount, state?.language)) } });
   };
 
   const handlePayDebt = (amount) => {
     if (state.money < amount) {
-      Alert.alert('Yetersiz Bakiye', 'Bu ödemeyi yapmak için yeterli paranız yok.');
+      dispatch({ type: 'SHOW_ALERT', payload: { title: t('bank.alerts.noMoney'), message: t('bank.alerts.noMoneyDebt') } });
       return;
     }
     if (state.bankDebt <= 0) {
-      Alert.alert('Hata', 'Borcunuz bulunmuyor.');
+      dispatch({ type: 'SHOW_ALERT', payload: { title: t('bank.alerts.noDebt'), message: t('bank.alerts.noDebtDesc') } });
       return;
     }
     dispatch({ type: 'PAY_DEBT', payload: { amount } });
   };
 
+  const handleDeposit = (amount) => {
+    if (state.money < amount) {
+      dispatch({ type: 'SHOW_ALERT', payload: { title: t('bank.alerts.noMoney'), message: t('bank.alerts.noMoneyDeposit') } });
+      return;
+    }
+    dispatch({ type: 'DEPOSIT_MONEY', payload: amount });
+  };
+
+  const handleWithdraw = (amount) => {
+    if ((state.bankSavings || 0) < amount) {
+      dispatch({ type: 'SHOW_ALERT', payload: { title: t('bank.alerts.noMoney'), message: t('bank.alerts.noMoneyWithdraw') } });
+      return;
+    }
+    dispatch({ type: 'WITHDRAW_MONEY', payload: amount });
+  };
+
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Kredi Notu ve Borç Durumu */}
-      <View style={styles.card}>
+      <GlassView intensity={30} tint="dark" style={styles.card}>
         <View style={styles.titleRow}>
           <Text style={styles.titleIcon}>🏦</Text>
-          <Text style={styles.titleText}>Banka Şubesi</Text>
+          <Text style={styles.titleText}>{t('bank.title')}</Text>
         </View>
 
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Kredi Notu (Findeks)</Text>
+            <Text style={styles.statLabel}>{t('bank.creditScore')}</Text>
             <Text style={[styles.statValue, { color: state.creditScore < 1000 ? '#e74c3c' : '#2ecc71' }]}>
               {state.creditScore}
             </Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Toplam Borç</Text>
+            <Text style={styles.statLabel}>{t('bank.totalDebt')}</Text>
             <Text style={[styles.statValue, { color: '#e74c3c' }]}>
-              {formatMoneyFull(state.bankDebt || 0)}
+              {formatMoneyFull(state.bankDebt || 0, state?.language)}
             </Text>
           </View>
         </View>
-        <Text style={styles.infoText}>💡 Ay sonlarında borcunuza %5 faiz biner. Borç ödedikçe kredi notunuz artar.</Text>
-      </View>
+        <Text style={styles.infoText}>{t('bank.debtInfo')}</Text>
+      </GlassView>
+
+      {/* Vadeli Mevduat */}
+      <GlassView intensity={30} tint="dark" style={styles.card}>
+        <View style={styles.titleRow}>
+          <Text style={styles.titleIcon}>💼</Text>
+          <Text style={styles.titleText}>{t('bank.savingsTitle')}</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Text style={styles.statLabel}>{t('bank.savingsAmount')}</Text>
+          <Text style={[styles.statValue, { color: '#f1c40f', fontSize: 24, marginBottom: 12 }]}>
+            {formatMoneyFull(state.bankSavings || 0, state?.language)}
+          </Text>
+        </View>
+        <Text style={styles.infoText}>{t('bank.savingsInfo')}</Text>
+        
+        <View style={styles.buttonRow}>
+          <TouchableOpacity style={[styles.actionBtn, styles.saveBtn]} onPress={() => handleDeposit(1000)}>
+            <Text style={styles.actionBtnText}>{t('bank.deposit').replace('{amount}', '1.000')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, styles.saveBtn]} onPress={() => handleDeposit(5000)}>
+            <Text style={styles.actionBtnText}>{t('bank.deposit').replace('{amount}', '5.000')}</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.buttonRow}>
+          <TouchableOpacity style={[styles.actionBtn, styles.withdrawBtn]} onPress={() => handleWithdraw(1000)}>
+            <Text style={styles.actionBtnText}>{t('bank.withdraw').replace('{amount}', '1.000')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.actionBtn, styles.withdrawBtn]} onPress={() => handleWithdraw(5000)}>
+            <Text style={styles.actionBtnText}>{t('bank.withdraw').replace('{amount}', '5.000')}</Text>
+          </TouchableOpacity>
+        </View>
+      </GlassView>
 
       {/* Kredi Çekme */}
-      <View style={styles.card}>
+      <GlassView intensity={30} tint="dark" style={styles.card}>
         <Text style={styles.sectionTitle}>💳 İhtiyaç Kredisi Çek</Text>
         <View style={styles.buttonRow}>
           <TouchableOpacity style={styles.actionBtn} onPress={() => handleTakeLoan(1000)}>
-            <Text style={styles.actionBtnText}>1.000 TL</Text>
+            <Text style={styles.actionBtnText}>1.000 ${getCurrency(state?.language)}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn} onPress={() => handleTakeLoan(5000)}>
-            <Text style={styles.actionBtnText}>5.000 TL</Text>
+            <Text style={styles.actionBtnText}>5.000 ${getCurrency(state?.language)}</Text>
           </TouchableOpacity>
         </View>
         <View style={styles.buttonRow}>
           <TouchableOpacity style={styles.actionBtn} onPress={() => handleTakeLoan(10000)}>
-            <Text style={styles.actionBtnText}>10.000 TL</Text>
+            <Text style={styles.actionBtnText}>10.000 ${getCurrency(state?.language)}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn} onPress={() => handleTakeLoan(50000)}>
-            <Text style={styles.actionBtnText}>50.000 TL</Text>
+            <Text style={styles.actionBtnText}>50.000 ${getCurrency(state?.language)}</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </GlassView>
 
       {/* Borç Ödeme */}
       {state.bankDebt > 0 && (
-        <View style={styles.card}>
+        <GlassView intensity={30} tint="dark" style={styles.card}>
           <Text style={styles.sectionTitle}>💰 Borç Öde</Text>
           <View style={styles.buttonRow}>
             <TouchableOpacity style={[styles.actionBtn, styles.payBtn]} onPress={() => handlePayDebt(Math.min(500, state.bankDebt))}>
-              <Text style={styles.actionBtnText}>Asgari (500 TL)</Text>
+              <Text style={styles.actionBtnText}>Asgari (500 ${getCurrency(state?.language)})</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.actionBtn, styles.payBtn]} onPress={() => handlePayDebt(state.bankDebt)}>
               <Text style={styles.actionBtnText}>Tamamını Kapat</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </GlassView>
       )}
-    </View>
+      <View style={{height: 100}} />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { paddingHorizontal: 16 },
   card: {
-    backgroundColor: 'rgba(52, 152, 219, 0.1)',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    padding: 20,
+    borderRadius: 20,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(52, 152, 219, 0.25)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    overflow: 'hidden',
   },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
   titleIcon: { fontSize: 20 },
@@ -115,8 +167,11 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 14, fontWeight: '800', color: '#ecf0f1', marginBottom: 10 },
   buttonRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
   actionBtn: {
-    flex: 1, backgroundColor: '#3498db', paddingVertical: 12, borderRadius: 10, alignItems: 'center',
+    flex: 1, backgroundColor: 'rgba(52, 152, 219, 0.15)', paddingVertical: 14, borderRadius: 16, alignItems: 'center',
+    borderWidth: 1, borderColor: 'rgba(52, 152, 219, 0.3)'
   },
-  payBtn: { backgroundColor: '#2ecc71' },
-  actionBtnText: { color: 'white', fontWeight: '800', fontSize: 13 },
+  payBtn: { backgroundColor: 'rgba(46, 204, 113, 0.15)', borderColor: 'rgba(46, 204, 113, 0.3)' },
+  saveBtn: { backgroundColor: 'rgba(241, 196, 15, 0.15)', borderColor: 'rgba(241, 196, 15, 0.3)' },
+  withdrawBtn: { backgroundColor: 'rgba(127, 140, 141, 0.15)', borderColor: 'rgba(127, 140, 141, 0.3)' },
+  actionBtnText: { color: '#ecf0f1', fontWeight: '800', fontSize: 14 },
 });

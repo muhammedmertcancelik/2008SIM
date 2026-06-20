@@ -33,6 +33,18 @@ export class EventEngine {
     // İlişki Durumu (Örn: Sadece bekarlara gelsin)
     if (conditions.maritalStatus && state.profile.maritalStatus !== conditions.maritalStatus) return false;
 
+    // === Yaşayan Roman Sİstemi Kontrolleri ===
+    if (conditions.chapter !== undefined && state.currentChapter !== conditions.chapter) return false;
+    if (conditions.minChapter !== undefined && state.currentChapter < conditions.minChapter) return false;
+    if (conditions.maxChapter !== undefined && state.currentChapter > conditions.maxChapter) return false;
+    
+    if (conditions.npc) {
+      if (!state.metNpcs?.includes(conditions.npc.id)) return false;
+      const rel = state.npcRelationships?.[conditions.npc.id] || 0;
+      if (conditions.npc.minRel !== undefined && rel < conditions.npc.minRel) return false;
+      if (conditions.npc.maxRel !== undefined && rel > conditions.npc.maxRel) return false;
+    }
+
     return true;
   }
 

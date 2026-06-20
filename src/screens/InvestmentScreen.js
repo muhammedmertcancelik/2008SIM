@@ -3,6 +3,7 @@
 // ============================================
 
 import React, { useState } from 'react';
+import GlassView from '../components/GlassView';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { useGame } from '../state/GameContext';
 import { formatMoney, formatPercent } from '../utils/formatter';
@@ -19,7 +20,7 @@ export default function InvestmentScreen() {
     const amount = getAmount(stock.id);
     const totalCost = amount * stock.currentPrice;
     if (totalCost > state.money) {
-      Alert.alert('Yetersiz Bakiye', `Bu işlem için ${formatMoney(totalCost)} TL gerekli.`);
+      dispatch({ type: 'SHOW_ALERT', payload: { title: 'Yetersiz Bakiye', message: `Bu işlem için ${formatMoney(totalCost)} TL gerekli.` } });
       return;
     }
     dispatch({ type: 'BUY_STOCK', payload: { stockId: stock.id, amount, pricePerUnit: stock.currentPrice } });
@@ -29,7 +30,7 @@ export default function InvestmentScreen() {
     const amount = getAmount(stock.id);
     const owned = state.portfolio[stock.id] || 0;
     if (owned < amount) {
-      Alert.alert('Yetersiz Miktar', `Sadece ${owned} adet ${stock.name} bulunuyor.`);
+      dispatch({ type: 'SHOW_ALERT', payload: { title: 'Yetersiz Miktar', message: `Sadece ${owned} adet ${stock.name} bulunuyor.` } });
       return;
     }
     dispatch({ type: 'SELL_STOCK', payload: { stockId: stock.id, amount, pricePerUnit: stock.currentPrice } });
@@ -38,7 +39,7 @@ export default function InvestmentScreen() {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Portföy Özeti */}
-      <View style={styles.portfolioCard}>
+      <GlassView intensity={30} tint='dark' style={styles.portfolioCard}>
         <View style={styles.sectionTitle}>
           <Text style={styles.sectionIcon}>🏆</Text>
           <Text style={styles.sectionText}>Portföy Özeti</Text>
@@ -63,7 +64,7 @@ export default function InvestmentScreen() {
           <Text style={styles.totalLabel}>Toplam Portföy: </Text>
           <Text style={styles.totalValue}>{formatMoney(totalPortfolio)} TL</Text>
         </View>
-      </View>
+      </GlassView>
 
       {/* Yatırım Kartları */}
       {state.currentStocks.map(stock => {
@@ -73,7 +74,7 @@ export default function InvestmentScreen() {
         const amount = getAmount(stock.id);
 
         return (
-          <View key={stock.id} style={styles.stockCard}>
+          <GlassView intensity={30} tint='dark' key={stock.id} style={styles.stockCard}>
             {/* Üst kısım */}
             <View style={styles.stockHeader}>
               <View style={styles.stockInfo}>
@@ -124,12 +125,12 @@ export default function InvestmentScreen() {
             <Text style={styles.totalLine}>
               Toplam: {formatMoney(stock.currentPrice * amount)} TL
             </Text>
-          </View>
+          </GlassView>
         );
       })}
 
       {/* İşlemler */}
-      <View style={styles.transactionsCard}>
+      <GlassView intensity={30} tint='dark' style={styles.transactionsCard}>
         <View style={styles.sectionTitle}>
           <Text style={styles.sectionIcon}>📋</Text>
           <Text style={styles.sectionText}>İşlemler</Text>
@@ -157,7 +158,7 @@ export default function InvestmentScreen() {
             );
           })
         )}
-      </View>
+      </GlassView>
 
       <View style={{ height: 20 }} />
     </ScrollView>
@@ -215,15 +216,15 @@ const styles = StyleSheet.create({
   },
   buyStockBtn: {
     flex: 1, paddingVertical: 12, borderRadius: 50, alignItems: 'center',
-    backgroundColor: '#2ecc71',
-    shadowColor: '#2ecc71', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 3,
+    backgroundColor: 'rgba(46, 204, 113, 0.15)',
+    borderWidth: 1, borderColor: 'rgba(46, 204, 113, 0.3)',
   },
   buyStockBtnText: { color: 'white', fontWeight: '700', fontSize: 14 },
   sellStockBtn: {
     flex: 1, paddingVertical: 12, borderRadius: 50, alignItems: 'center',
-    backgroundColor: '#bdc3c7',
+    backgroundColor: 'rgba(189, 195, 199, 0.15)',
   },
-  sellStockBtnActive: { backgroundColor: '#e74c3c', shadowColor: '#e74c3c', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 3 },
+  sellStockBtnActive: { backgroundColor: 'rgba(231, 76, 60, 0.15)', borderColor: 'rgba(231, 76, 60, 0.3)', borderWidth: 1 },
   sellStockBtnText: { color: 'white', fontWeight: '700', fontSize: 14 },
   totalLine: { textAlign: 'center', fontSize: 11, color: '#95a5a6', fontWeight: '600', marginTop: 8 },
   transactionsCard: {

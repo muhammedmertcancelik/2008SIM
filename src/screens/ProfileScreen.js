@@ -18,15 +18,15 @@ export default function ProfileScreen() {
 
   const handleBuyCourse = (course) => {
     if (state.skills.includes(course.id)) {
-      Alert.alert('Zaten Alındı', 'Bu eğitimi zaten tamamladınız.');
+      dispatch({ type: 'SHOW_ALERT', payload: { title: 'Zaten Alındı', message: 'Bu eğitimi zaten tamamladınız.' } });
       return;
     }
     if (course.requirement && !state.skills.includes(course.requirement)) {
-      Alert.alert('Gereksinim Eksik', 'Bu kursu alabilmek için önceki eğitimleri tamamlamalısınız.');
+      dispatch({ type: 'SHOW_ALERT', payload: { title: 'Gereksinim Eksik', message: 'Bu kursu alabilmek için önceki eğitimleri tamamlamalısınız.' } });
       return;
     }
     if (state.money < course.cost) {
-      Alert.alert('Yetersiz Bakiye', 'Bu kurs için yeterli paranız yok.');
+      dispatch({ type: 'SHOW_ALERT', payload: { title: 'Yetersiz Bakiye', message: 'Bu kurs için yeterli paranız yok.' } });
       return;
     }
 
@@ -40,21 +40,21 @@ export default function ProfileScreen() {
     // Geçici olarak yetenekleri eklemek için action ekleyeceğiz (veya MAKE_CHOICE'u genişleteceğiz).
     // Basitlik adına GameContext içine TAKE_COURSE ve BUY_ASSET reducer'ı ekleyeceğim.
     dispatch({ type: 'TAKE_COURSE', payload: { course } });
-    Alert.alert('Eğitim Tamamlandı', `Tebrikler! Yeni mesleğiniz: ${course.newJob}`);
+    dispatch({ type: 'SHOW_ALERT', payload: { title: 'Eğitim Tamamlandı', message: `Tebrikler! Yeni mesleğiniz: ${course.newJob}` } });
   };
 
   const handleBuyAsset = (asset) => {
     if (state.inventory.includes(asset.id)) {
-      Alert.alert('Zaten Alındı', 'Buna zaten sahipsiniz.');
+      dispatch({ type: 'SHOW_ALERT', payload: { title: 'Zaten Alındı', message: 'Buna zaten sahipsiniz.' } });
       return;
     }
     if (state.money < asset.cost) {
-      Alert.alert('Yetersiz Bakiye', 'Bu mülkü almak için paranız yetmiyor. Bankadan kredi çekebilirsiniz.');
+      dispatch({ type: 'SHOW_ALERT', payload: { title: 'Yetersiz Bakiye', message: 'Bu mülkü almak için paranız yetmiyor. Bankadan kredi çekebilirsiniz.' } });
       return;
     }
 
     dispatch({ type: 'BUY_ASSET', payload: { asset } });
-    Alert.alert('Hayırlı Olsun!', `${asset.title} satın aldınız.`);
+    dispatch({ type: 'SHOW_ALERT', payload: { title: 'Hayırlı Olsun!', message: `${asset.title} satın aldınız.` } });
   };
 
   return (
